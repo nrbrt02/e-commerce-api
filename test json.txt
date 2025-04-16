@@ -1,0 +1,203 @@
+{
+  "auth": {
+    "registerUser": {
+      "username": "admin_user",
+      "email": "admin@example.com",
+      "password": "Password123!",
+      "firstName": "Admin",
+      "lastName": "User",
+      "roleName": "admin"
+    },
+    "registerSupplier": {
+      "username": "supplier_user",
+      "email": "supplier@example.com",
+      "password": "Password123!",
+      "firstName": "Supplier",
+      "lastName": "User",
+      "roleName": "supplier"
+    },
+    "registerCustomer": {
+      "username": "customer1",
+      "email": "customer@example.com",
+      "password": "Password123!",
+      "firstName": "John",
+      "lastName": "Doe",
+      "phone": "+1234567890"
+    },
+    "login": {
+      "email": "admin@example.com",
+      "password": "Password123!"
+    },
+    "customerLogin": {
+      "email": "customer@example.com",
+      "password": "Password123!"
+    }
+  },
+  "users": {
+    "createUser": {
+      "username": "new_user",
+      "email": "newuser@example.com",
+      "password": "Password123!",
+      "firstName": "New",
+      "lastName": "User",
+      "isActive": true,
+      "roleIds": [2]
+    },
+    "updateUser": {
+      "firstName": "Updated",
+      "lastName": "Name",
+      "isActive": true
+    },
+    "updatePassword": {
+      "password": "NewPassword123!"
+    }
+  },
+  "products": {
+    "createProduct": {
+      "name": "Test Product",
+      "description": "This is a test product description",
+      "shortDescription": "Short description",
+      "sku": "TP-001",
+      "price": 99.99,
+      "compareAtPrice": 129.99,
+      "costPrice": 60.00,
+      "isPublished": true,
+      "isFeatured": false,
+      "isDigital": false,
+      "quantity": 100,
+      "lowStockThreshold": 10,
+      "weight": 1.5,
+      "dimensions": {
+        "length": 10,
+        "width": 5,
+        "height": 2
+      },
+      "tags": ["test", "sample", "new"],
+      "categoryIds": [1]
+    },
+    "updateProduct": {
+      "name": "Updated Product Name",
+      "price": 89.99,
+      "isPublished": true,
+      "quantity": 120
+    }
+  },
+  "categories": {
+    "createCategory": {
+      "name": "Electronics",
+      "description": "Electronic products and gadgets",
+      "isActive": true
+    },
+    "createSubcategory": {
+      "name": "Smartphones",
+      "description": "Mobile phones and accessories",
+      "parentId": 1,
+      "isActive": true
+    },
+    "updateCategory": {
+      "name": "Updated Category Name",
+      "description": "Updated description",
+      "isActive": true
+    }
+  },
+  "addresses": {
+    "createAddress": {
+      "firstName": "John",
+      "lastName": "Doe",
+      "company": "Example Company",
+      "addressLine1": "123 Main St",
+      "addressLine2": "Apt 4B",
+      "city": "New York",
+      "state": "NY",
+      "postalCode": "10001",
+      "country": "USA",
+      "phone": "+1234567890",
+      "isDefault": true,
+      "type": "both"
+    },
+    "updateAddress": {
+      "addressLine1": "456 Park Ave",
+      "city": "Boston",
+      "state": "MA",
+      "postalCode": "02108"
+    }
+  },
+  "orders": {
+    "createOrder": {
+      "items": [
+        {
+          "productId": 1,
+          "quantity": 2
+        },
+        {
+          "productId": 2,
+          "quantity": 1
+        }
+      ],
+      "shippingAddress": {
+        "firstName": "John",
+        "lastName": "Doe",
+        "addressLine1": "123 Main St",
+        "city": "New York",
+        "state": "NY",
+        "postalCode": "10001",
+        "country": "USA"
+      },
+      "billingAddress": {
+        "firstName": "John",
+        "lastName": "Doe",
+        "addressLine1": "123 Main St",
+        "city": "New York",
+        "state": "NY",
+        "postalCode": "10001",
+        "country": "USA"
+      },
+      "paymentMethod": "credit_card",
+      "shippingMethod": "standard"
+    },
+    "updateOrderStatus": {
+      "status": "processing"
+    },
+    "updatePaymentStatus": {
+      "paymentStatus": "paid",
+      "paymentDetails": {
+        "transactionId": "tx_123456789",
+        "provider": "stripe",
+        "method": "credit_card",
+        "last4": "4242"
+      }
+    }
+  },
+  "reviews": {
+    "createReview": {
+      "rating": 5,
+      "title": "Great product!",
+      "comment": "This product exceeded my expectations. Would definitely recommend."
+    },
+    "updateReview": {
+      "rating": 4,
+      "title": "Good product",
+      "comment": "Updated review comment."
+    }
+  },
+  "wishlists": {
+    "createWishlist": {
+      "name": "Birthday Wishlist",
+      "isPublic": true
+    },
+    "updateWishlist": {
+      "name": "Holiday Wishlist",
+      "isPublic": false
+    },
+    "addProductToWishlist": {
+      "productId": 1,
+      "notes": "I would like this in blue if possible"
+    },
+    "updateWishlistItemNotes": {
+      "notes": "Updated notes for this item"
+    },
+    "moveProductToAnotherWishlist": {
+      "targetWishlistId": 2
+    }
+  }
+}

@@ -1,0 +1,94 @@
+Authentication
+
+POST /api/auth/register - Register a new user (admin/supplier)
+POST /api/auth/customer/register - Register a new customer
+POST /api/auth/login - Login a user (admin/supplier)
+POST /api/auth/customer/login - Login a customer
+GET /api/auth/me - Get current authenticated user profile
+
+Users
+
+GET /api/users - Get all users
+GET /api/users/ - Get user by ID
+POST /api/users - Create a new user
+PUT /api/users/ - Update a user
+DELETE /api/users/ - Delete a user
+PUT /api/users//password - Update user password
+
+Customers
+
+GET /api/customers - Get all customers
+GET /api/customers/ - Get customer by ID
+PUT /api/customers/ - Update a customer
+DELETE /api/customers/ - Delete a customer
+PUT /api/customers//password - Update customer password
+GET /api/customers//orders - Get customer orders
+GET /api/customers/profile - Get customer profile
+PUT /api/customers/profile - Update customer profile
+PUT /api/customers/profile/password - Update customer password
+
+Products
+
+GET /api/products - Get all products
+GET /api/products/ - Get product by ID
+POST /api/products - Create a new product
+PUT /api/products/ - Update a product
+DELETE /api/products/ - Delete a product
+
+Categories
+
+GET /api/categories - Get all categories
+GET /api/categories/tree - Get category tree
+GET /api/categories/ - Get category by ID
+GET /api/categories//products - Get products by category
+POST /api/categories - Create a new category
+PUT /api/categories/ - Update a category
+DELETE /api/categories/ - Delete a category
+
+Orders
+
+GET /api/orders - Get all orders
+GET /api/orders/ - Get order by ID
+POST /api/orders - Create a new order
+PATCH /api/orders//status - Update order status
+PATCH /api/orders//payment - Update payment status
+PATCH /api/orders//cancel - Cancel an order
+GET /api/orders/my-orders - Get customer orders
+
+Addresses
+
+GET /api/addresses - Get all addresses
+GET /api/addresses/ - Get address by ID
+POST /api/addresses - Create a new address
+PUT /api/addresses/ - Update an address
+DELETE /api/addresses/ - Delete an address
+PATCH /api/addresses//set-default - Set address as default
+
+Reviews
+
+GET /api/products//reviews - Get all reviews for a product
+GET /api/reviews/ - Get review by ID
+POST /api/products//reviews - Create a new review
+PUT /api/reviews/ - Update a review
+DELETE /api/reviews/ - Delete a review
+POST /api/reviews//vote - Vote a review as helpful
+GET /api/reviews/customer/me - Get customer reviews
+
+Wishlists
+
+GET /api/wishlists - Get all wishlists
+GET /api/wishlists/ - Get wishlist by ID
+POST /api/wishlists - Create a new wishlist
+PUT /api/wishlists/ - Update a wishlist
+DELETE /api/wishlists/ - Delete a wishlist
+POST /api/wishlists//items - Add product to wishlist
+DELETE /api/wishlists//items/ - Remove product from wishlist
+PUT /api/wishlists//items/ - Update wishlist item notes
+POST /api/wishlists//items//move - Move product to another wishlist
+
+Uploads
+
+POST /api/upload/avatar - Upload avatar
+POST /api/upload/product/ - Upload product images
+POST /api/upload/review/ - Upload review images
+DELETE /api/upload/file - Delete uploaded file
