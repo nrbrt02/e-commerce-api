@@ -1,8 +1,6 @@
-import { Model, DataTypes, Optional, Association, Transaction } from 'sequelize';
-import sequelize from '../config/db';
+import { Model, DataTypes, Optional, Association, Transaction, Sequelize } from 'sequelize';
 import bcrypt from 'bcrypt';
 import config from '../config/env';
-import Role from './Role';
 
 // User attributes interface
 export interface UserAttributes {
@@ -30,7 +28,7 @@ declare module 'sequelize' {
 }
 
 // User model class
-class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
+export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   public id!: number;
   public username!: string;
   public email!: string;
@@ -43,16 +41,13 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   
-  // Define associations
-  public readonly roles?: Role[];
-
   // Standard Sequelize association methods
-  public getRoles!: () => Promise<Role[]>;
-  public setRoles!: (roles: Role[]) => Promise<void>;
+  public getRoles!: () => Promise<any[]>;
+  public setRoles!: (roles: any[]) => Promise<void>;
   
   // Add the Sequelize association methods that are being used in the code
-  public $get!: <K extends 'roles'>(key: K) => Promise<K extends 'roles' ? Role[] : never>;
-  public $add!: <K extends 'roles'>(key: K, values: K extends 'roles' ? Role[] : never, options?: { transaction?: Transaction }) => Promise<void>;
+  public $get!: <K extends 'roles'>(key: K) => Promise<K extends 'roles' ? any[] : never>;
+  public $add!: <K extends 'roles'>(key: K, values: K extends 'roles' ? any[] : never, options?: { transaction?: Transaction }) => Promise<void>;
   
   // Method to check if password matches
   public async validatePassword(password: string): Promise<boolean> {
@@ -91,90 +86,85 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   
   // Define associations structure for TypeScript
   public static associations: {
-    roles: Association<User, Role>;
+    roles: Association<User, any>;
   };
 }
 
-// Initialize User model
-User.init(
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
-    },
-    username: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-      unique: true,
-    },
-    email: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-      unique: true,
-      validate: {
-        isEmail: true,
+export default function defineUserModel(sequelize: Sequelize): typeof User {
+  // Initialize User model
+  User.init(
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+      },
+      username: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        unique: true,
+      },
+      email: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+        unique: true,
+        validate: {
+          isEmail: true,
+        },
+      },
+      password: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+      },
+      firstName: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+      },
+      lastName: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+      },
+      avatar: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+      },
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+      lastLogin: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+      },
+      updatedAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
       },
     },
-    password: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-    },
-    firstName: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    lastName: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    avatar: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    isActive: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
-    },
-    lastLogin: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-  },
-  {
-    sequelize,
-    modelName: 'User',
-    tableName: 'users',
-    hooks: {
-      // Hash password before saving to database
-      beforeCreate: async (user: User) => {
-        user.password = await bcrypt.hash(user.password, config.bcrypt.saltRounds);
-      },
-      beforeUpdate: async (user: User) => {
-        if ((user as any).changed && (user as any).changed('password')) {
+    {
+      sequelize,
+      modelName: 'User',
+      tableName: 'users',
+      hooks: {
+        // Hash password before saving to database
+        beforeCreate: async (user: User) => {
           user.password = await bcrypt.hash(user.password, config.bcrypt.saltRounds);
-        }
+        },
+        beforeUpdate: async (user: User) => {
+          if ((user as any).changed && (user as any).changed('password')) {
+            user.password = await bcrypt.hash(user.password, config.bcrypt.saltRounds);
+          }
+        },
       },
-    },
-  }
-);
+    }
+  );
 
-// Create a junction table for User-Role many-to-many relationship
-const UserRole = sequelize.define('UserRole', {}, { timestamps: false });
-
-// Define associations
-User.belongsToMany(Role, { through: UserRole, as: 'roles' });
-Role.belongsToMany(User, { through: UserRole, as: 'users' });
-
-export default User;
+  return User;
+}

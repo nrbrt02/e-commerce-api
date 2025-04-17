@@ -1,16 +1,28 @@
 import express from 'express';
-import * as authController from '../controllers/authController';
-import { authenticate } from '../middleware/auth';
+import { 
+  registerAdmin,
+  registerCustomer, 
+  login, 
+  getCurrentUser, 
+  updateAuthPassword as updatePassword, 
+  forgotPassword, 
+  resetPassword 
+} from '../controllers';
+import { protect } from '../middleware/auth';
 
 const router = express.Router();
 
 // Public routes
-router.post('/register', authController.registerUser);
-router.post('/customer/register', authController.registerCustomer);
-router.post('/login', authController.loginUser);
-router.post('/customer/login', authController.loginCustomer);
+router.post('/register', registerAdmin); // For admin/supplier registration
+router.post('/customer/register', registerCustomer); // For customer registration
+router.post('/login', login);
+router.post('/customer/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
-router.get('/me', authenticate, authController.getMe);
+router.use(protect); // Middleware to protect routes below
+router.get('/me', getCurrentUser);
+router.patch('/update-password', updatePassword);
 
 export default router;

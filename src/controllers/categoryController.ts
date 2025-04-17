@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
-import Category from '../models/Category';
-import Product from '../models/Product';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
+import models from '../models';
+import { CategoryAttributes } from '../models/Category';
+
+const { Category, Product } = models;
 
 // Define interface for the tree node structure
 interface CategoryTreeNode extends Record<string, any> {
@@ -65,8 +67,8 @@ export const getCategoryTree = asyncHandler(async (req: Request, res: Response) 
   // Build the tree with explicit return type
   const buildTree = (parentId: number | null = null): CategoryTreeNode[] => {
     return allCategories
-      .filter(category => category.parentId === parentId)
-      .map(category => ({
+      .filter((category: any) => category.parentId === parentId)
+      .map((category: any) => ({
         ...category.toJSON(),
         children: buildTree(category.id),
       }));

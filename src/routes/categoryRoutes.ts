@@ -1,20 +1,29 @@
 import express from 'express';
-import * as categoryController from '../controllers/categoryController';
-import { authenticate } from '../middleware/auth';
-import { hasPermission } from '../middleware/roleCheck';
+import { 
+  getCategories, 
+  getCategoryTree,
+  getCategoryById, 
+  getCategoryProducts,
+  createCategory,
+  updateCategory,
+  deleteCategory
+} from '../controllers';
+import { protect, restrictTo } from '../middleware/auth';
 
 const router = express.Router();
 
 // Public routes
-router.get('/', categoryController.getCategories);
-router.get('/tree', categoryController.getCategoryTree);
-router.get('/:id', categoryController.getCategoryById);
-router.get('/:id/products', categoryController.getCategoryProducts);
+router.get('/', getCategories);
+router.get('/tree', getCategoryTree);
+router.get('/:id', getCategoryById);
+router.get('/:id/products', getCategoryProducts);
 
-// Protected routes (Admin only)
-router.use(authenticate);
-router.post('/', hasPermission(['category:create']), categoryController.createCategory);
-router.put('/:id', hasPermission(['category:update']), categoryController.updateCategory);
-router.delete('/:id', hasPermission(['category:delete']), categoryController.deleteCategory);
+// Protected routes - Admin only
+router.use(protect);
+router.use(restrictTo('admin'));
+
+router.post('/', createCategory);
+router.put('/:id', updateCategory);
+router.delete('/:id', deleteCategory);
 
 export default router;

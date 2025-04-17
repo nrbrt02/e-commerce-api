@@ -1,5 +1,4 @@
-import { Model, DataTypes, Optional } from 'sequelize';
-import sequelize from '../config/db';
+import { Model, DataTypes, Optional, Sequelize } from 'sequelize';
 import bcrypt from 'bcrypt';
 import config from '../config/env';
 
@@ -29,7 +28,7 @@ interface CustomerCreationAttributes extends Optional<CustomerAttributes,
   'createdAt' | 'updatedAt'> {}
 
 // Customer model class
-class Customer extends Model<CustomerAttributes, CustomerCreationAttributes> implements CustomerAttributes {
+export class Customer extends Model<CustomerAttributes, CustomerCreationAttributes> implements CustomerAttributes {
   public id!: number;
   public username!: string;
   public email!: string;
@@ -97,96 +96,98 @@ class Customer extends Model<CustomerAttributes, CustomerCreationAttributes> imp
   }
 }
 
-// Initialize Customer model
-Customer.init(
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
-    },
-    username: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-      unique: true,
-    },
-    email: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-      unique: true,
-      validate: {
-        isEmail: true,
+export default function defineCustomerModel(sequelize: Sequelize): typeof Customer {
+  // Initialize Customer model
+  Customer.init(
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+      },
+      username: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        unique: true,
+      },
+      email: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+        unique: true,
+        validate: {
+          isEmail: true,
+        },
+      },
+      password: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+      },
+      firstName: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+      },
+      lastName: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+      },
+      avatar: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+      },
+      phone: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+      },
+      isVerified: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+      lastLogin: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      addresses: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+      preferences: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+      },
+      updatedAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
       },
     },
-    password: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-    },
-    firstName: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    lastName: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    avatar: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    phone: {
-      type: DataTypes.STRING(20),
-      allowNull: true,
-    },
-    isVerified: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
-    isActive: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
-    },
-    lastLogin: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    addresses: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-    },
-    preferences: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-  },
-  {
-    sequelize,
-    modelName: 'Customer',
-    tableName: 'customers',
-    hooks: {
-      // Hash password before saving to database
-      beforeCreate: async (customer: Customer) => {
-        customer.password = await bcrypt.hash(customer.password, config.bcrypt.saltRounds);
-      },
-      beforeUpdate: async (customer: Customer) => {
-        if ((customer as any).changed && (customer as any).changed('password')) {
+    {
+      sequelize,
+      modelName: 'Customer',
+      tableName: 'customers',
+      hooks: {
+        // Hash password before saving to database
+        beforeCreate: async (customer: Customer) => {
           customer.password = await bcrypt.hash(customer.password, config.bcrypt.saltRounds);
-        }
+        },
+        beforeUpdate: async (customer: Customer) => {
+          if ((customer as any).changed && (customer as any).changed('password')) {
+            customer.password = await bcrypt.hash(customer.password, config.bcrypt.saltRounds);
+          }
+        },
       },
-    },
-  }
-);
+    }
+  );
 
-export default Customer;
+  return Customer;
+}

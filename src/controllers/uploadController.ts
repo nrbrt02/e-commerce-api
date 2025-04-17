@@ -5,12 +5,11 @@ import { v4 as uuidv4 } from 'uuid';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
 import logger from '../config/logger';
-import ProductImage from '../models/ProductImage';
-import User from '../models/User';
-import Customer from '../models/Customer';
-import Review from '../models/Review';
 import config from '../config/env';
 import { UploadedFile } from 'express-fileupload';
+import models from '../models';
+
+const { ProductImage, User, Customer, Review } = models;
 
 // Allowed file types
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -61,7 +60,7 @@ export const uploadProductImages = asyncHandler(async (req: Request, res: Respon
   
   // Process each file
   // Add type annotation for uploadedImages array
-  const uploadedImages: ProductImage[] = [];
+  const uploadedImages: any[] = [];
   
   for (const file of files) {
     const fileName = `${uuidv4()}${path.extname(file.name)}`;
@@ -72,11 +71,12 @@ export const uploadProductImages = asyncHandler(async (req: Request, res: Respon
     await file.mv(fullPath);
     
     // Create product image record with explicit type annotation
-    const image: ProductImage = await ProductImage.create({
+    const image = await ProductImage.create({
       productId: parseInt(productId),
       url: filePath,
       alt: file.name.split('.')[0] || '',
-      position: uploadedImages.length,
+      order: uploadedImages.length,
+      isDefault: uploadedImages.length === 0, // First image is default
     });
     
     uploadedImages.push(image);

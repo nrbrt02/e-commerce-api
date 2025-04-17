@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './errorHandler';
-import User from '../models/User';
-import Role from '../models/Role';
+import models from '../models'; // Import models from your models index
 import logger from '../config/logger';
+
+// Extract User and Role from your models
+const { User, Role } = models;
 
 /**
  * Middleware to check if user has required roles
@@ -23,7 +25,7 @@ export const hasRole = (roles: string[]) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      const userRoles = await user.$get('roles') as Role[];
+      const userRoles = await user.$get('roles') as typeof Role[];
       const roleNames = userRoles.map(role => role.name);
 
       const hasRequiredRole = roles.some(role => roleNames.includes(role));
@@ -61,7 +63,7 @@ export const hasPermission = (requiredPermissions: string[]) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      const userRoles = await user.$get('roles') as Role[];
+      const userRoles = await user.$get('roles') as typeof Role[];
       
       // Collect all permissions from all user roles
       const userPermissions = userRoles.reduce((allPermissions: string[], role) => {

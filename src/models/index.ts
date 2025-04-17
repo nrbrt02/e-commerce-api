@@ -1,75 +1,192 @@
-import { Sequelize, DataTypes } from 'sequelize';
-import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
-import logger from '../config/logger';
+// src/models/index.ts
+import { Sequelize } from 'sequelize';
+import sequelize from '../config/db';
+import { logger } from '../utils/logger';
 
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Import model definitions
+import defineAddressModel, { Address } from './Address';
+import defineCategoryModel, { Category } from './Category'; 
+import defineCustomerModel, { Customer } from './Customer';
+import defineOrderModel, { Order } from './Order';
+import defineOrderItemModel, { OrderItem } from './OrderItem';
+import defineProductModel, { Product } from './Product';
+import defineProductImageModel, { ProductImage } from './ProductImage';
+import defineReviewModel, { Review } from './Review';
+import defineRoleModel, { Role } from './Role';
+import defineUserModel, { User } from './User';
+import defineWishlistModel, { Wishlist } from './Wishlist';
 
-// Database configuration
-const dbName = process.env.DB_NAME || 'ecommerce';
-const dbUser = process.env.DB_USER || 'postgres';
-const dbPassword = process.env.DB_PASSWORD || '';
-const dbHost = process.env.DB_HOST || 'localhost';
-const dbPort = parseInt(process.env.DB_PORT || '5432', 10);
-const dbDialect = process.env.DB_DIALECT || 'postgres';
+import config from '../config/db';
 
-// Create Sequelize instance
-export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
-  host: dbHost,
-  port: dbPort,
-  dialect: dbDialect as any, // Cast to any since TypeScript might not recognize all dialect options
-  logging: (msg) => logger.debug(msg),
-  pool: {
-    max: 5,
-    min: 0,
-    acquire: 30000,
-    idle: 10000
-  }
-});
 
-// Import all models and associations
-const db: any = {};
+// Create models object
+const models: Record<string, any> = {};
 
-// Read all model files in the current directory
-fs.readdirSync(__dirname)
-  .filter(file => 
-    file.indexOf('.') !== 0 && 
-    file !== 'index.ts' &&
-    file.slice(-3) === '.ts'
-  )
-  .forEach(file => {
+try {
+  // Initialize all models
+  models.Address = defineAddressModel(sequelize);
+  models.Category = defineCategoryModel(sequelize);
+  models.Customer = defineCustomerModel(sequelize);
+  models.Product = defineProductModel(sequelize);
+  models.ProductImage = defineProductImageModel(sequelize);
+  models.Review = defineReviewModel(sequelize);
+  models.Role = defineRoleModel(sequelize);
+  models.User = defineUserModel(sequelize);
+  models.Order = defineOrderModel(sequelize);
+  models.OrderItem = defineOrderItemModel(sequelize);
+  models.Wishlist = defineWishlistModel(sequelize);
+
+
+
+  // Create junction tables for many-to-many relationships
+  const UserRole = sequelize.define('UserRole', {}, { timestamps: false });
+  const ProductCategory = sequelize.define('ProductCategory', {}, { timestamps: false });
+  const WishlistItem = sequelize.define('WishlistItem', {}, { timestamps: false });
+
+  // Setup associations
+  // Address associations
+  models.Address.belongsTo(models.Customer, { foreignKey: 'customerId', as: 'customer' });
+  models.Customer.hasMany(models.Address, { foreignKey: 'customerId', as: 'customerAddresses' });
+
+  // Category associations
+  models.Category.belongsTo(models.Category, { foreignKey: 'parentId', as: 'parent' });
+  models.Category.hasMany(models.Category, { foreignKey: 'parentId', as: 'subcategories' });
+
+  // Product associations
+  models.Product.belongsTo(models.User, { as: 'supplier', foreignKey: 'supplierId' });
+  models.Product.belongsToMany(models.Category, { through: ProductCategory, as: 'categories' });
+  models.Category.belongsToMany(models.Product, { through: ProductCategory, as: 'products' });
+
+  // ProductImage associations
+  models.ProductImage.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
+  models.Product.hasMany(models.ProductImage, { foreignKey: 'productId', as: 'productImages' }); // Using 'productImages' to avoid collision with 'imageUrls' attribute
+
+  // Review associations
+  models.Review.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
+  models.Product.hasMany(models.Review, { foreignKey: 'productId', as: 'reviews' });
+  models.Review.belongsTo(models.Customer, { foreignKey: 'customerId', as: 'customer' });
+  models.Customer.hasMany(models.Review, { foreignKey: 'customerId', as: 'reviews' });
+
+  // Order associations
+  models.Order.belongsTo(models.Customer, { foreignKey: 'customerId', as: 'customer' });
+  models.Customer.hasMany(models.Order, { foreignKey: 'customerId', as: 'orders' });
+  models.Order.hasMany(models.OrderItem, { foreignKey: 'orderId', as: 'items' });
+  models.OrderItem.belongsTo(models.Order, { foreignKey: 'orderId', as: 'order' });
+  models.OrderItem.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
+
+  // User-Role associations
+  models.User.belongsToMany(models.Role, { through: UserRole, as: 'roles' });
+  models.Role.belongsToMany(models.User, { through: UserRole, as: 'users' });
+
+  // Wishlist associations
+  models.Wishlist.belongsTo(models.Customer, { foreignKey: 'customerId', as: 'customer' });
+  models.Customer.hasMany(models.Wishlist, { foreignKey: 'customerId', as: 'wishlists' });
+  models.Wishlist.belongsToMany(models.Product, { through: WishlistItem, as: 'products' });
+  models.Product.belongsToMany(models.Wishlist, { through: WishlistItem, as: 'wishlists' });
+
+  // Helper functions for model hooks
+  // Implement the updateProductRating function for the Review hooks
+  const updateProductRating = async (productId: number): Promise<void> => {
     try {
-      // Import model file
-      const modelModule = require(path.join(__dirname, file));
-      
-      // Check if the module has a default export that's a function
-      if (typeof modelModule.default === 'function') {
-        const model = modelModule.default(sequelize, DataTypes);
-        db[model.name] = model;
-      } else {
-        // If it's already a model instance
-        if (modelModule.default && modelModule.default.name) {
-          db[modelModule.default.name] = modelModule.default;
-        } else {
-          logger.warn(`Model file ${file} doesn't export a valid model`);
-        }
+      // Get all approved reviews for this product
+      const reviews = await models.Review.findAll({
+        where: {
+          productId,
+          isApproved: true,
+        },
+        attributes: ['rating'],
+      });
+
+      // Calculate average rating
+      let avgRating = 0;
+      if (reviews.length > 0) {
+        // Fix for: Parameter 'total' implicitly has an 'any' type
+        // Fix for: Parameter 'review' implicitly has an 'any' type
+        const sum = reviews.reduce((total: number, review: { rating: number }) => total + review.rating, 0);
+        avgRating = sum / reviews.length;
       }
+
+      // Update product with new rating
+      await models.Product.update(
+        {
+          metadata: {
+            ...((await models.Product.findByPk(productId))?.get('metadata') || {}),
+            rating: {
+              average: avgRating,
+              count: reviews.length,
+            },
+          },
+        },
+        {
+          where: { id: productId },
+        }
+      );
     } catch (error) {
-      logger.error(`Error importing model from file ${file}:`, error);
+      logger.error(`Error updating product rating: ${error}`);
+    }
+  };
+
+  // Implement updateOrderTotals for OrderItem hooks
+  const updateOrderTotals = async (orderId: number): Promise<void> => {
+    try {
+      // Get all items for this order
+      const items = await models.OrderItem.findAll({
+        where: { orderId },
+      });
+
+      // Calculate totals
+      const totalItems = items.length;
+      // Fix for: Parameter 'sum' implicitly has an 'any' type
+      // Fix for: Parameter 'item' implicitly has an 'any' type
+      const totalAmount = items.reduce((sum: number, item: { total: number }) => sum + Number(item.total), 0);
+
+      // Update order with new totals
+      await models.Order.update(
+        {
+          totalItems,
+          totalAmount,
+        },
+        {
+          where: { id: orderId },
+        }
+      );
+    } catch (error) {
+      logger.error(`Error updating order totals: ${error}`);
+    }
+  };
+
+  // Add hook implementations for Review model
+  models.Review.addHook('afterCreate', async (review: Review) => {
+    await updateProductRating(review.productId);
+  });
+
+  models.Review.addHook('afterUpdate', async (review: Review) => {
+    if (review.changed('rating') || review.changed('isApproved')) {
+      await updateProductRating(review.productId);
     }
   });
 
-// Create associations between models
-Object.keys(db).forEach(modelName => {
-  if (db[modelName].associate) {
-    db[modelName].associate(db);
-  }
-});
+  models.Review.addHook('afterDestroy', async (review: Review) => {
+    await updateProductRating(review.productId);
+  });
 
-// Add sequelize and Sequelize to the db object
-db.sequelize = sequelize;
-db.Sequelize = Sequelize;
+  // Add hook implementations for OrderItem model
+  models.OrderItem.addHook('afterCreate', async (item: OrderItem) => {
+    await updateOrderTotals(item.orderId);
+  });
 
-export default db;
+  models.OrderItem.addHook('afterUpdate', async (item: OrderItem) => {
+    await updateOrderTotals(item.orderId);
+  });
+
+  models.OrderItem.addHook('afterDestroy', async (item: OrderItem) => {
+    await updateOrderTotals(item.orderId);
+  });
+
+} catch (error) {
+  logger.error(`Error setting up models and associations: ${error}`);
+  throw error;
+}
+
+export { sequelize };
+export default models;

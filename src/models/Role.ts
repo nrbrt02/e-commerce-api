@@ -1,5 +1,4 @@
-import { Model, DataTypes, Optional } from 'sequelize';
-import sequelize from '../config/db';
+import { Model, DataTypes, Optional, Sequelize } from 'sequelize';
 
 // Role attributes interface
 export interface RoleAttributes {
@@ -15,7 +14,7 @@ export interface RoleAttributes {
 interface RoleCreationAttributes extends Optional<RoleAttributes, 'id' | 'description' | 'permissions' | 'createdAt' | 'updatedAt'> {}
 
 // Role model class
-class Role extends Model<RoleAttributes, RoleCreationAttributes> implements RoleAttributes {
+export class Role extends Model<RoleAttributes, RoleCreationAttributes> implements RoleAttributes {
   public id!: number;
   public name!: string;
   public description!: string;
@@ -24,44 +23,46 @@ class Role extends Model<RoleAttributes, RoleCreationAttributes> implements Role
   public updatedAt!: Date;
 }
 
-// Initialize Role model
-Role.init(
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
+export default function defineRoleModel(sequelize: Sequelize): typeof Role {
+  // Initialize Role model
+  Role.init(
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+      },
+      name: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        unique: true,
+      },
+      description: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+      },
+      permissions: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: [],
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+      },
+      updatedAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+      },
     },
-    name: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-      unique: true,
-    },
-    description: {
-      type: DataTypes.STRING(200),
-      allowNull: true,
-    },
-    permissions: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: false,
-      defaultValue: [],
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    },
-  },
-  {
-    sequelize,
-    modelName: 'Role',
-    tableName: 'roles',
-  }
-);
+    {
+      sequelize,
+      modelName: 'Role',
+      tableName: 'roles',
+    }
+  );
 
-export default Role;
+  return Role;
+}

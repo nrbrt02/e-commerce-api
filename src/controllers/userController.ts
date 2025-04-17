@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import User from '../models/User';
-import Role from '../models/Role';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
-import { hashPassword } from '../utils/passwordUtils';
 import logger from '../config/logger';
+import models from '../models';
+
+const { User, Role } = models;
 
 /**
  * Get all users

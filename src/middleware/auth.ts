@@ -1,87 +1,94 @@
-// src/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
-// Use require instead of import for jwt to bypass TypeScript's strict type checking
-const jwt = require('jsonwebtoken');
+import * as jwt from 'jsonwebtoken';
+import { Secret } from 'jsonwebtoken';
+import { AppError } from './errorHandler';
+import models from '../models';
 import config from '../config/env';
-import User from '../models/User';
-import logger from '../config/logger';
 
-/**
- * Interface to extend Express Request with authenticated user
- */
+const { User, Customer } = models;
+
+// Extend Request interface to include user
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: any;
     }
   }
 }
 
-/**
- * JWT payload interface
- */
+// Interface for JWT payload
 interface JwtPayload {
   id: number;
+  role: string;
   iat: number;
   exp: number;
 }
 
 /**
- * Authentication middleware to protect routes
+ * Protect routes - Check if user is authenticated
  */
-export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const protect = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ message: 'Authentication required. Please provide a valid token.' });
-      return;
+    let token: string | undefined;
+
+    // Check if token exists in headers
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
     }
-    
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    try {
-      // Verify token using the required jwt module
-      const decoded = jwt.verify(token, config.jwt.secret);
-      
-      // Find user by id
-      const user = await User.findByPk(decoded.id);
-      
-      if (!user) {
-        res.status(401).json({ message: 'User not found or token is invalid.' });
-        return;
-      }
-      
-      if (!user.isActive) {
-        res.status(403).json({ message: 'User account is disabled.' });
-        return;
-      }
-      
-      // Attach user to request object
-      req.user = user;
-      next();
-    } catch (error) {
-      logger.error('JWT verification failed:', error);
-      res.status(401).json({ message: 'Invalid token. Please log in again.' });
+
+    // Check if token exists
+    if (!token) {
+      return next(new AppError('You are not logged in. Please log in to get access.', 401));
     }
+
+    // Verify token
+    const secretKey: Secret = config.jwt.secret;
+    const decoded = jwt.verify(token, secretKey) as JwtPayload;
+
+    // Check if user still exists
+    const Model = decoded.role === 'admin' ? User : Customer;
+    const currentUser = await Model.findByPk(decoded.id);
+
+    if (!currentUser) {
+      return next(new AppError('The user belonging to this token no longer exists.', 401));
+    }
+
+    // Check if user is active
+    if (!currentUser.isActive) {
+      return next(new AppError('Your account has been deactivated. Please contact support.', 401));
+    }
+
+    // Attach user to request
+    req.user = currentUser;
+
+    next();
   } catch (error) {
-    logger.error('Authentication middleware error:', error);
-    res.status(500).json({ message: 'Internal server error during authentication.' });
+    return next(new AppError('Not authorized to access this route', 401));
   }
 };
 
 /**
- * Generate JWT token for authenticated user
+ * Restrict routes to specific roles
  */
-export const generateToken = (userId: number): string => {
-  // Use the required jwt module
-  return jwt.sign(
-    { id: userId },
-    config.jwt.secret,
-    {
-      expiresIn: config.jwt.expiresIn,
+export const restrictTo = (...roles: string[]) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    // If user has admin role, allow access
+    if (req.user.role === 'admin') {
+      return next();
     }
-  );
+
+    // If user is admin user (not customer), check roles
+    if (req.user.role === 'admin') {
+      const hasRole = await req.user.hasAnyRole(roles);
+      
+      if (!hasRole) {
+        return next(new AppError('You do not have permission to perform this action', 403));
+      }
+    } else if (!roles.includes('customer')) {
+      // If user is customer and roles don't include 'customer'
+      return next(new AppError('You do not have permission to perform this action', 403));
+    }
+
+    next();
+  };
 };

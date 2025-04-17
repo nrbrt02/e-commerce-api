@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import Product from '../models/Product';
-import Category from '../models/Category';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
 import { Op } from 'sequelize';
-import User from '../models/User';
+import models from '../models';
+
+const { Product, Category, User } = models;
 
 /**
  * Get all products
@@ -240,7 +240,7 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
     dimensions,
     metadata,
     tags,
-    images,
+    imageUrls: images, // Changed from 'images' to 'imageUrls'
     supplierId,
   });
 
@@ -300,13 +300,18 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
     'name', 'description', 'shortDescription', 'sku', 'barcode',
     'price', 'compareAtPrice', 'costPrice', 'isPublished', 'isFeatured',
     'isDigital', 'quantity', 'lowStockThreshold', 'weight', 'dimensions',
-    'metadata', 'tags', 'images'
+    'metadata', 'tags'
   ];
   
   for (const field of fieldsToUpdate) {
     if (req.body[field] !== undefined) {
       (product as any)[field] = req.body[field];
     }
+  }
+  
+  // Handle the renamed 'images' field
+  if (req.body.images !== undefined) {
+    product.imageUrls = req.body.images;
   }
   
   // Only admin can update supplier

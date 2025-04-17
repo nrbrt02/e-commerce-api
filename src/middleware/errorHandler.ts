@@ -1,17 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
+import { ValidationError } from 'sequelize';
 import logger from '../config/logger';
-import config from '../config/env';
 
 /**
- * Custom error class with status code
+ * Custom Error class for API errors
  */
 export class AppError extends Error {
   statusCode: number;
+  status: string;
   isOperational: boolean;
 
   constructor(message: string, statusCode: number) {
     super(message);
     this.statusCode = statusCode;
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
     this.isOperational = true;
 
     Error.captureStackTrace(this, this.constructor);
@@ -21,10 +23,8 @@ export class AppError extends Error {
 /**
  * Handle Sequelize validation errors
  */
-const handleSequelizeValidationError = (err: any) => {
-  const message = Object.values(err.errors)
-    .map((e: any) => e.message)
-    .join(', ');
+const handleSequelizeValidationError = (err: ValidationError) => {
+  const message = `Validation error: ${err.errors.map(e => e.message).join(', ')}`;
   return new AppError(message, 400);
 };
 
@@ -32,57 +32,66 @@ const handleSequelizeValidationError = (err: any) => {
  * Handle JWT errors
  */
 const handleJWTError = () => new AppError('Invalid token. Please log in again.', 401);
-
-/**
- * Handle JWT expiration
- */
 const handleJWTExpiredError = () => new AppError('Your token has expired. Please log in again.', 401);
 
 /**
- * Global error handling middleware
+ * Send error response for development environment
+ */
+const sendErrorDev = (err: AppError, res: Response) => {
+  res.status(err.statusCode).json({
+    status: err.status,
+    error: err,
+    message: err.message,
+    stack: err.stack,
+  });
+};
+
+/**
+ * Send error response for production environment
+ */
+const sendErrorProd = (err: AppError, res: Response) => {
+  // Operational, trusted error: send message to client
+  if (err.isOperational) {
+    res.status(err.statusCode).json({
+      status: err.status,
+      message: err.message,
+    });
+  } 
+  // Programming or unknown error: don't leak error details
+  else {
+    // Log error
+    logger.error('ERROR 💥', err);
+
+    // Send generic message
+    res.status(500).json({
+      status: 'error',
+      message: 'Something went wrong',
+    });
+  }
+};
+
+/**
+ * Global error handler middleware
  */
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   err.statusCode = err.statusCode || 500;
-  err.message = err.message || 'Internal Server Error';
+  err.status = err.status || 'error';
 
-  // Log the error
-  logger.error(`${err.statusCode} - ${err.message}`, {
-    url: req.originalUrl,
-    method: req.method,
-    error: err,
-    stack: err.stack,
-  });
+  if (process.env.NODE_ENV === 'development') {
+    sendErrorDev(err, res);
+  } else if (process.env.NODE_ENV === 'production') {
+    let error = { ...err };
+    error.message = err.message;
 
-  // Handle specific error types
-  let error = { ...err };
-  error.message = err.message;
-
-  if (err.name === 'SequelizeValidationError') error = handleSequelizeValidationError(err);
-  if (err.name === 'JsonWebTokenError') error = handleJWTError();
-  if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
-
-  // Development vs Production error responses
-  if (config.server.nodeEnv === 'development') {
-    return res.status(err.statusCode).json({
-      status: 'error',
-      message: err.message,
-      error: err,
-      stack: err.stack,
-    });
-  } else {
-    // Don't leak error details in production
-    if (error.isOperational) {
-      return res.status(err.statusCode).json({
-        status: 'error',
-        message: err.message,
-      });
-    } else {
-      // For programming or unknown errors
-      logger.error('PROGRAMMING ERROR: ', err);
-      return res.status(500).json({
-        status: 'error',
-        message: 'Something went wrong!',
-      });
+    // Handle Sequelize validation errors
+    if (err instanceof ValidationError) {
+      error = handleSequelizeValidationError(err);
     }
+
+    // Handle JWT errors
+    if (err.name === 'JsonWebTokenError') error = handleJWTError();
+    if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
+
+    sendErrorProd(error, res);
   }
 };

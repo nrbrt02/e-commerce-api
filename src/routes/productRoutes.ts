@@ -1,36 +1,33 @@
 import express from 'express';
-import * as productController from '../controllers/productController';
-import { authenticate } from '../middleware/auth';
-import { hasRole, hasPermission } from '../middleware/roleCheck';
+import { 
+  getProducts, 
+  getProductById, 
+  createProduct, 
+  updateProduct, 
+  deleteProduct,
+  getProductReviews,
+  createReview
+} from '../controllers';
+import { protect, restrictTo } from '../middleware/auth';
 
 const router = express.Router();
 
 // Public routes
-router.get('/', productController.getProducts);
-router.get('/:id', productController.getProductById);
+router.get('/', getProducts);
+router.get('/:id', getProductById);
+
+// Reviews routes (nested)
+router.get('/:productId/reviews', getProductReviews);
 
 // Protected routes
-router.use(authenticate);
+router.use(protect);
 
-// Create product - accessible to admin and supplier
-router.post(
-  '/',
-  hasPermission(['product:create']),
-  productController.createProduct
-);
+// Customer can create reviews
+router.post('/:productId/reviews', restrictTo('customer'), createReview);
 
-// Update product - accessible to admin and supplier (of the specific product)
-router.put(
-  '/:id',
-  hasPermission(['product:update']),
-  productController.updateProduct
-);
-
-// Delete product - accessible to admin and supplier (of the specific product)
-router.delete(
-  '/:id',
-  hasPermission(['product:delete']),
-  productController.deleteProduct
-);
+// Admin and supplier can create/update/delete products
+router.post('/', restrictTo('admin', 'supplier'), createProduct);
+router.put('/:id', restrictTo('admin', 'supplier'), updateProduct);
+router.delete('/:id', restrictTo('admin', 'supplier'), deleteProduct);
 
 export default router;

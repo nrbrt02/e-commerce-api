@@ -3,21 +3,19 @@ import config from '../config/env';
 
 /**
  * Hash a password
- * 
- * @param password Plain text password
+ * @param password - Plain text password
  * @returns Hashed password
  */
 export const hashPassword = async (password: string): Promise<string> => {
-  return bcrypt.hash(password, config.bcrypt.saltRounds);
+  return await bcrypt.hash(password, config.bcrypt.saltRounds);
 };
 
 /**
- * Validate a password against a hash
- * 
- * @param password Plain text password
- * @param hashedPassword Hashed password to compare against
- * @returns Boolean indicating if passwords match
+ * Compare a password with a hash
+ * @param password - Plain text password
+ * @param hash - Hashed password
+ * @returns Boolean indicating if password matches hash
  */
-export const comparePassword = async (password: string, hashedPassword: string): Promise<boolean> => {
-  return bcrypt.compare(password, hashedPassword);
+export const comparePassword = async (password: string, hash: string): Promise<boolean> => {
+  return await bcrypt.compare(password, hash);
 };

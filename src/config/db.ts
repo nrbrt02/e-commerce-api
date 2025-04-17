@@ -32,7 +32,8 @@ export const testConnection = async (): Promise<void> => {
 // Function to sync models with database
 export const syncDatabase = async (): Promise<void> => {
   try {
-    await sequelize.sync({ alter: config.server.nodeEnv === 'development' });
+    // Fix: Using config.nodeEnv directly instead of config.server.nodeEnv
+    await sequelize.sync({ alter: config.nodeEnv === 'development' });
     logger.info('Database synchronized successfully.');
   } catch (error) {
     logger.error('Unable to sync database:', error);

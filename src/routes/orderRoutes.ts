@@ -1,22 +1,29 @@
 import express from 'express';
-import * as orderController from '../controllers/orderController';
-import { authenticate } from '../middleware/auth';
-import { hasRole, hasPermission } from '../middleware/roleCheck';
+import { 
+  getOrders,
+  getOrderById,
+  createOrder,
+  updateOrderStatus,
+  updatePaymentStatus,
+  cancelOrder,
+  getMyOrders
+} from '../controllers';
+import { protect, restrictTo } from '../middleware/auth';
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(authenticate);
+router.use(protect);
 
 // Customer routes
-router.get('/my-orders', orderController.getMyOrders);
-router.post('/', orderController.createOrder);
-router.patch('/:id/cancel', orderController.cancelOrder);
+router.get('/my-orders', restrictTo('customer'), getMyOrders);
+router.post('/', restrictTo('customer'), createOrder);
+router.patch('/:id/cancel', cancelOrder); // Both admin and customer can cancel
 
 // Admin routes
-router.get('/', hasPermission(['order:view']), orderController.getOrders);
-router.get('/:id', hasPermission(['order:view']), orderController.getOrderById);
-router.patch('/:id/status', hasPermission(['order:update']), orderController.updateOrderStatus);
-router.patch('/:id/payment', hasPermission(['order:update']), orderController.updatePaymentStatus);
+router.get('/', restrictTo('admin'), getOrders);
+router.get('/:id', getOrderById); // Both admin and customer (if their own order)
+router.patch('/:id/status', restrictTo('admin'), updateOrderStatus);
+router.patch('/:id/payment', restrictTo('admin'), updatePaymentStatus);
 
 export default router;

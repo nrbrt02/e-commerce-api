@@ -1,6 +1,5 @@
 // src/models/Product.ts
-import { Model, DataTypes, Optional } from 'sequelize';
-import sequelize from '../config/db';
+import { Model, DataTypes, Optional, Sequelize } from 'sequelize';
 
 // Define the interface for Product attributes
 interface ProductAttributes {
@@ -22,7 +21,7 @@ interface ProductAttributes {
   dimensions: object | null;
   metadata: object | null;
   tags: string[] | null;
-  images: string[] | null;
+  imageUrls: string[] | null; // Renamed from 'images' to 'imageUrls' to avoid naming collision
   supplierId: number;
   createdAt?: Date;
   updatedAt?: Date;
@@ -31,8 +30,8 @@ interface ProductAttributes {
 // Define the interface for creating a Product (optional fields)
 export interface ProductCreationAttributes extends Optional<ProductAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
 
-// Define the Product model class with static associate method
-class Product extends Model<ProductAttributes, ProductCreationAttributes> implements ProductAttributes {
+// Define the Product model class
+export class Product extends Model<ProductAttributes, ProductCreationAttributes> implements ProductAttributes {
   public id!: number;
   public name!: string;
   public description!: string;
@@ -51,7 +50,7 @@ class Product extends Model<ProductAttributes, ProductCreationAttributes> implem
   public dimensions!: object | null;
   public metadata!: object | null;
   public tags!: string[] | null;
-  public images!: string[] | null;
+  public imageUrls!: string[] | null; // Renamed from 'images' to 'imageUrls'
   public supplierId!: number;
   
   public readonly createdAt!: Date;
@@ -63,121 +62,105 @@ class Product extends Model<ProductAttributes, ProductCreationAttributes> implem
   public addCategory!: (category: any) => Promise<void>;
   public removeCategory!: (category: any) => Promise<void>;
   public hasCategory!: (category: any) => Promise<boolean>;
-  
-  // Declare static methods
-  static associate: (models: any) => void;
 }
 
-// Initialize Product model
-Product.init(
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
-    },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    shortDescription: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    sku: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    barcode: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    price: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-    },
-    compareAtPrice: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-    },
-    costPrice: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-    },
-    isPublished: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    isFeatured: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    isDigital: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    quantity: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
-    lowStockThreshold: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    weight: {
-      type: DataTypes.FLOAT,
-      allowNull: true,
-    },
-    dimensions: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-    },
-    metadata: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-    },
-    tags: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: true,
-    },
-    images: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: true,
-    },
-    supplierId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'users',
-        key: 'id',
+export default function defineProductModel(sequelize: Sequelize): typeof Product {
+  // Initialize Product model
+  Product.init(
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+      },
+      name: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      shortDescription: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      sku: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+      },
+      barcode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      price: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+      },
+      compareAtPrice: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      costPrice: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+      },
+      isPublished: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      isFeatured: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      isDigital: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      quantity: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      lowStockThreshold: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      weight: {
+        type: DataTypes.FLOAT,
+        allowNull: true,
+      },
+      dimensions: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+      metadata: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+      tags: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: true,
+      },
+      imageUrls: { // Renamed from 'images' to 'imageUrls'
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: true,
+      },
+      supplierId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'users',
+          key: 'id',
+        },
       },
     },
-  },
-  {
-    sequelize,
-    modelName: 'Product',
-    tableName: 'products',
-  }
-);
+    {
+      sequelize,
+      modelName: 'Product',
+      tableName: 'products',
+    }
+  );
 
-// Define the static associate method
-Product.associate = (models) => {
-  // Define association with User (supplier)
-  Product.belongsTo(models.User, {
-    as: 'supplier',
-    foreignKey: 'supplierId',
-  });
-  
-  // Define association with Category
-  Product.belongsToMany(models.Category, {
-    through: 'ProductCategory',
-    as: 'categories',
-  });
-};
-
-export default Product;
+  return Product;
+}

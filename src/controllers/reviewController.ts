@@ -1,12 +1,10 @@
 import { Request, Response } from 'express';
-import Review from '../models/Review';
-import Product from '../models/Product';
-import Customer from '../models/Customer';
-import Order from '../models/Order';
-import OrderItem from '../models/OrderItem';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
 import { Op } from 'sequelize';
+import models from '../models';
+
+const { Review, Product, Customer, Order, OrderItem } = models;
 
 /**
  * Get all reviews for a product
@@ -107,7 +105,7 @@ export const getReviewById = asyncHandler(async (req: Request, res: Response) =>
       {
         model: Product,
         as: 'product',
-        attributes: ['id', 'name', 'slug', 'images'],
+        attributes: ['id', 'name', 'slug', 'imageUrls'], // Changed from 'images' to 'imageUrls'
       },
     ],
   });
@@ -189,9 +187,7 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
         {
           model: OrderItem,
           as: 'items',
-          where: {
-            productId,
-          },
+          where: { productId },
         },
       ],
     });
@@ -213,9 +209,7 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
         {
           model: OrderItem,
           as: 'items',
-          where: {
-            productId,
-          },
+          where: { productId },
         },
       ],
     });
@@ -385,7 +379,7 @@ export const getCustomerReviews = asyncHandler(async (req: Request, res: Respons
       {
         model: Product,
         as: 'product',
-        attributes: ['id', 'name', 'slug', 'images'],
+        attributes: ['id', 'name', 'slug', 'imageUrls'], // Changed from 'images' to 'imageUrls'
       },
     ],
     order: [['createdAt', 'DESC']],

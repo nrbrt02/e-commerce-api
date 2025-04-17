@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import { Wishlist, WishlistItem } from '../models/Wishlist';
-import Product from '../models/Product';
-import Customer from '../models/Customer';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
-import sequelize from '../config/db';
+import models from '../models';
+
+const { Wishlist, Product, Customer } = models;
+const { sequelize } = models;
 
 /**
  * Get all wishlists for the authenticated customer
@@ -18,15 +18,10 @@ export const getCustomerWishlists = asyncHandler(async (req: Request, res: Respo
     },
     include: [
       {
-        model: WishlistItem,
-        as: 'items',
-        include: [
-          {
-            model: Product,
-            as: 'product',
-            attributes: ['id', 'name', 'slug', 'price', 'images'],
-          },
-        ],
+        model: Product,
+        as: 'products',
+        through: { attributes: ['id', 'notes'] },
+        attributes: ['id', 'name', 'slug', 'price', 'imageUrls'], // Changed from 'images' to 'imageUrls'
       },
     ],
   });
@@ -49,15 +44,10 @@ export const getWishlistById = asyncHandler(async (req: Request, res: Response) 
   const wishlist = await Wishlist.findByPk(req.params.id, {
     include: [
       {
-        model: WishlistItem,
-        as: 'items',
-        include: [
-          {
-            model: Product,
-            as: 'product',
-            attributes: ['id', 'name', 'slug', 'price', 'images'],
-          },
-        ],
+        model: Product,
+        as: 'products',
+        through: { attributes: ['id', 'notes'] },
+        attributes: ['id', 'name', 'slug', 'price', 'imageUrls'], // Changed from 'images' to 'imageUrls'
       },
       {
         model: Customer,
@@ -90,7 +80,7 @@ export const getWishlistById = asyncHandler(async (req: Request, res: Response) 
  * @access Private (Customer)
  */
 export const createWishlist = asyncHandler(async (req: Request, res: Response) => {
-  const { name, isPublic } = req.body;
+  const { name, description, isPublic } = req.body;
   
   // Validate name
   if (!name) {
@@ -101,6 +91,7 @@ export const createWishlist = asyncHandler(async (req: Request, res: Response) =
   const wishlist = await Wishlist.create({
     customerId: req.user!.id,
     name,
+    description,
     isPublic: isPublic !== undefined ? isPublic : false,
   });
   
@@ -118,7 +109,7 @@ export const createWishlist = asyncHandler(async (req: Request, res: Response) =
  * @access Private (Customer)
  */
 export const updateWishlist = asyncHandler(async (req: Request, res: Response) => {
-  const { name, isPublic } = req.body;
+  const { name, description, isPublic } = req.body;
   
   // Find wishlist
   const wishlist = await Wishlist.findByPk(req.params.id);
@@ -134,6 +125,7 @@ export const updateWishlist = asyncHandler(async (req: Request, res: Response) =
   
   // Update wishlist
   if (name) wishlist.name = name;
+  if (description !== undefined) wishlist.description = description;
   if (isPublic !== undefined) wishlist.isPublic = isPublic;
   
   await wishlist.save();
@@ -204,7 +196,7 @@ export const addProductToWishlist = asyncHandler(async (req: Request, res: Respo
   }
   
   // Check if product already in wishlist
-  const existingItem = await WishlistItem.findOne({
+  const existingItem = await sequelize.models.WishlistItem.findOne({
     where: {
       wishlistId: wishlist.id,
       productId,
@@ -216,19 +208,19 @@ export const addProductToWishlist = asyncHandler(async (req: Request, res: Respo
   }
   
   // Add product to wishlist
-  const wishlistItem = await WishlistItem.create({
+  const wishlistItem = await sequelize.models.WishlistItem.create({
     wishlistId: wishlist.id,
     productId,
     notes,
   });
   
   // Get the product details to return
-  const itemWithProduct = await WishlistItem.findByPk(wishlistItem.id, {
+  const itemWithProduct = await sequelize.models.WishlistItem.findByPk(wishlistItem.id, {
     include: [
       {
         model: Product,
         as: 'product',
-        attributes: ['id', 'name', 'slug', 'price', 'images'],
+        attributes: ['id', 'name', 'slug', 'price', 'imageUrls'], // Changed from 'images' to 'imageUrls'
       },
     ],
   });
@@ -262,7 +254,7 @@ export const removeProductFromWishlist = asyncHandler(async (req: Request, res: 
   }
   
   // Find wishlist item
-  const wishlistItem = await WishlistItem.findOne({
+  const wishlistItem = await sequelize.models.WishlistItem.findOne({
     where: {
       id: itemId,
       wishlistId: wishlist.id,
@@ -325,7 +317,7 @@ export const moveProductToAnotherWishlist = asyncHandler(async (req: Request, re
     }
     
     // Find wishlist item
-    const wishlistItem = await WishlistItem.findOne({
+    const wishlistItem = await sequelize.models.WishlistItem.findOne({
       where: {
         id: itemId,
         wishlistId: sourceWishlist.id,
@@ -338,7 +330,7 @@ export const moveProductToAnotherWishlist = asyncHandler(async (req: Request, re
     }
     
     // Check if product already exists in target wishlist
-    const existingItemInTarget = await WishlistItem.findOne({
+    const existingItemInTarget = await sequelize.models.WishlistItem.findOne({
       where: {
         wishlistId: targetWishlist.id,
         productId: wishlistItem.productId,
@@ -390,7 +382,7 @@ export const updateWishlistItemNotes = asyncHandler(async (req: Request, res: Re
   }
   
   // Find wishlist item
-  const wishlistItem = await WishlistItem.findOne({
+  const wishlistItem = await sequelize.models.WishlistItem.findOne({
     where: {
       id: itemId,
       wishlistId: wishlist.id,

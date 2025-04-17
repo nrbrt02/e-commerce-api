@@ -1,12 +1,12 @@
 import express from 'express';
 import * as userController from '../controllers/userController';
-import { authenticate } from '../middleware/auth';
+import { protect } from '../middleware/auth';
 import { hasRole, hasPermission } from '../middleware/roleCheck';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authenticate);
+router.use(protect);
 
 // Admin-only routes
 router.route('/')

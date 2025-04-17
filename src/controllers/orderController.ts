@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import Order, { OrderStatus, PaymentStatus } from '../models/Order';
-import OrderItem from '../models/OrderItem';
-import Product from '../models/Product';
-import Customer from '../models/Customer';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
 import { Op } from 'sequelize';
-import sequelize from '../config/db';
+import models from '../models';
+import { OrderStatus, PaymentStatus } from '../models/Order';
+
+const { Order, OrderItem, Product, Customer } = models;
+const { sequelize } = models;
 
 /**
  * Get all orders
@@ -160,7 +160,6 @@ export const getOrderById = asyncHandler(async (req: Request, res: Response) => 
  * @route POST /api/orders
  * @access Private (Customer)
  */
-
 export const createOrder = asyncHandler(async (req: Request, res: Response) => {
   const transaction = await sequelize.transaction();
   
@@ -231,14 +230,14 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
       // Create order item
       orderItems.push({
         productId: product.id,
-        productName: product.name,
-        productSku: product.sku,
+        sku: product.sku,
+        name: product.name,
         quantity: item.quantity,
         unitPrice: parseFloat(product.price.toString()),
         subtotal: itemSubtotal,
-        taxAmount: itemTax,
-        discountAmount: 0, // Apply discounts if needed
-        totalAmount: itemSubtotal + itemTax,
+        discount: 0,
+        tax: itemTax,
+        total: itemSubtotal + itemTax,
       });
       
       // Update product stock if not digital
@@ -271,18 +270,16 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
         orderNumber: generateOrderNumber(), // Add order number
         customerId,
         status: OrderStatus.PENDING,
+        totalAmount,
+        totalItems: items.length,
         paymentStatus: PaymentStatus.PENDING,
         paymentMethod: paymentMethod || 'credit_card',
-        currency: 'USD',
-        subtotal,
-        taxAmount,
-        shippingAmount,
-        discountAmount,
-        totalAmount,
-        shippingAddressId: req.body.shippingAddressId,
-        billingAddressId: req.body.billingAddressId,
+        paymentDetails: {},
         shippingMethod,
+        shippingAddress,
+        billingAddress,
         notes,
+        metadata: {},
       },
       { transaction }
     );
@@ -403,7 +400,6 @@ export const updatePaymentStatus = asyncHandler(async (req: Request, res: Respon
  * @route PATCH /api/orders/:id/cancel
  * @access Private (Admin, Customer)
  */
-
 export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
   const transaction = await sequelize.transaction();
   

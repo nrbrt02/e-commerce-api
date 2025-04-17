@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import Customer from '../models/Customer';
-import Order from '../models/Order';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
-import { hashPassword } from '../utils/passwordUtils';
 import logger from '../config/logger';
+import models from '../models';
+
+const { Customer, Order } = models;
 
 /**
  * Get all customers
