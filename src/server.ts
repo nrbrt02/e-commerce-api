@@ -7,58 +7,56 @@ import path from 'path';
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Import models and sequelize from the index file
+// Models & DB
 import db, { sequelize } from './models/index';
 
-// Import routes
+// Routes
 import userRoutes from './routes/userRoutes';
 import authRoutes from './routes/authRoutes';
 import productRoutes from './routes/productRoutes';
 import categoryRoutes from './routes/categoryRoutes';
-// Import other routes as needed
 
-// Import middleware
+// Middleware
 import { errorHandler } from './middleware/errorHandler';
 import logger from './config/logger';
 
-// Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// ✅ Proper CORS setup
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Routes
-app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes);
-// Use other routes as needed
-
-// Health check route
+// ✅ Add a quick sanity check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Error handling middleware
+// ✅ Register routes
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
+
+// ✅ Global error handling
 app.use(errorHandler);
 
-// Start server
+// ✅ Safe boot sequence
 const startServer = async () => {
   try {
-    // Test database connection
     await sequelize.authenticate();
     logger.info('Database connection established successfully');
-    
-    // Sync models with database (in development only)
+
     if (process.env.NODE_ENV !== 'production') {
       await sequelize.sync({ alter: true });
       logger.info('Database synchronized');
     }
-    
-    // Start server
+
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });
@@ -68,5 +66,4 @@ const startServer = async () => {
   }
 };
 
-// Start the server
 startServer();

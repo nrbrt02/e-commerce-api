@@ -60,6 +60,8 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     // Attach user to request
     req.user = currentUser;
+    // Also attach the role from the token to make it easily accessible
+    req.user.role = decoded.role;
 
     next();
   } catch (error) {
@@ -72,23 +74,32 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
  */
 export const restrictTo = (...roles: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
-    // If user has admin role, allow access
+    // Check if the user has the appropriate role
     if (req.user.role === 'admin') {
+      // For admin users (staff), check if they have any of the required roles through role-based permissions
+      // Only if roles array specifies particular admin roles (e.g., 'super-admin', 'manager')
+      if (roles.length > 0 && !roles.includes('admin')) {
+        // This is a restricted admin route that requires specific admin roles
+        const hasRole = await req.user.hasAnyRole(roles);
+        
+        if (!hasRole) {
+          return next(new AppError('You do not have permission to perform this action', 403));
+        }
+      }
+      // If no specific admin roles needed or 'admin' is explicitly allowed, permit access
       return next();
-    }
-
-    // If user is admin user (not customer), check roles
-    if (req.user.role === 'admin') {
-      const hasRole = await req.user.hasAnyRole(roles);
-      
-      if (!hasRole) {
+    } else if (req.user.role === 'customer') {
+      // For customers, only allow if 'customer' is in the allowed roles
+      if (!roles.includes('customer')) {
         return next(new AppError('You do not have permission to perform this action', 403));
       }
-    } else if (!roles.includes('customer')) {
-      // If user is customer and roles don't include 'customer'
-      return next(new AppError('You do not have permission to perform this action', 403));
+      return next();
+    } else {
+      // For any other role types that might be added in the future
+      if (!roles.includes(req.user.role)) {
+        return next(new AppError('You do not have permission to perform this action', 403));
+      }
+      return next();
     }
-
-    next();
   };
 };
