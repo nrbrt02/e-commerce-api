@@ -8,26 +8,34 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Models & DB
-import db, { sequelize } from './models/index';
+import db, { sequelize } from './src/models/index';
 
 // Routes
-import userRoutes from './routes/userRoutes';
-import authRoutes from './routes/authRoutes';
-import productRoutes from './routes/productRoutes';
-import categoryRoutes from './routes/categoryRoutes';
+import userRoutes from './src/routes/userRoutes';
+import authRoutes from './src/routes/authRoutes';
+import productRoutes from './src/routes/productRoutes';
+import categoryRoutes from './src/routes/categoryRoutes';
 
 // Middleware
-import { errorHandler } from './middleware/errorHandler';
-import logger from './config/logger';
+import { errorHandler } from './src/middleware/errorHandler';
+import logger from './src/config/logger';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ✅ Proper CORS setup
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: (origin, callback) => {
+    const allowedOrigins = ['http://localhost:5173', 'https://fastshopping.rw'];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
+
 
 app.use(express.json());
 app.use(morgan('dev'));

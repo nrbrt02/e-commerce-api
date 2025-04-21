@@ -28,7 +28,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', environment: config.server.nodeEnv });
+  res.status(200).json({ status: 'ok', environment: config.nodeEnv });
 });
 
 // API Routes

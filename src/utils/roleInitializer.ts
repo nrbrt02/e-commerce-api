@@ -1,4 +1,4 @@
-import Role from '../models/Role';
+import db from '../models';
 import logger from '../config/logger';
 
 // Define standard permissions by resource
@@ -53,6 +53,24 @@ const defaultRoles = [
   },
 ];
 
+// Get the Role model from db
+const Role = db.Role;
+
+// Define the Role type interface
+interface RoleAttributes {
+  id?: number;
+  name: string;
+  description: string;
+  permissions: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Define Role instance interface
+interface RoleInstance extends RoleAttributes {
+  update: (values: Partial<RoleAttributes>) => Promise<any>;
+}
+
 /**
  * Initialize roles in the database
  */
@@ -86,7 +104,7 @@ export const initializeRoles = async (): Promise<void> => {
 /**
  * Get role by name
  */
-export const getRoleByName = async (name: string): Promise<Role | null> => {
+export const getRoleByName = async (name: string): Promise<RoleInstance | null> => {
   return Role.findOne({ where: { name } });
 };
 
@@ -97,7 +115,7 @@ export const createCustomRole = async (
   name: string,
   description: string,
   rolePermissions: Record<string, string[]>
-): Promise<Role> => {
+): Promise<RoleInstance> => {
   const formattedPermissions = formatPermissions(rolePermissions);
   
   const [role, created] = await Role.findOrCreate({

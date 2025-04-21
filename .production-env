@@ -1,0 +1,26 @@
+# App Environment
+NODE_ENV=development
+PORT=3000
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=ecommerce
+DB_USER=postgres
+DB_PASSWORD=r00t
+DB_DIALECT=postgres
+DB_LOGGING=true
+DB_FORCE_SYNC=false
+
+# JWT Configuration
+JWT_SECRET=c2e92b801e123aa4147217b7d33c56b1d359deb2ea61ebeb7913eccc5c2c077b3b184d69ed5b0312d6193ee0552a3f97c28b47f5cb56d901c577c46dd0c071d5
+JWT_EXPIRES_IN=7d
+
+# Bcrypt Configuration
+BCRYPT_SALT_ROUNDS=10
+
+# Upload Directory
+UPLOAD_DIR=uploads
+
+# Logging
+LOG_LEVEL=debug

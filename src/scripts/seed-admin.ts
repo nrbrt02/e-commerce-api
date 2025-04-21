@@ -84,7 +84,7 @@ const roles = [
 const superadminUser = {
   username: 'superadmin',
   email: 'superadmin@example.com',
-  password: 'NLrBluwgOqAn', // This will be hashed before saving
+  password: 'NLrBluwgOqAn',
   firstName: 'Super',
   lastName: 'Admin',
   isActive: true,

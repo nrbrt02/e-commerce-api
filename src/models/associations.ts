@@ -2,16 +2,22 @@
 // This file should be imported after all models are defined
 // It sets up all relationships between models to avoid circular dependencies
 
-import Product from './Product';
-import Category from './Category';
-import ProductImage from './ProductImage';
-import Customer from './Customer';
-import Address from './Address';
+import { Sequelize } from 'sequelize';
+import db from './index';
 
 // Define all associations in one place
 const setupAssociations = () => {
+  const sequelize = db.sequelize as Sequelize;
+  
+  // Get model references from the db object instead of importing directly
+  const Product = db.Product;
+  const Category = db.Category;
+  const ProductImage = db.ProductImage;
+  const Customer = db.Customer;
+  const Address = db.Address;
+  
   // Create junction table for Product-Category many-to-many relationship
-  const ProductCategory = Product.sequelize?.define('ProductCategory', {}, { timestamps: false });
+  const ProductCategory = sequelize.define('ProductCategory', {}, { timestamps: false });
   
   // Product - Category (many-to-many)
   Product.belongsToMany(Category, { through: 'ProductCategory', as: 'productCategories' });

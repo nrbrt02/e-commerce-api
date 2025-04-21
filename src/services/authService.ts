@@ -1,11 +1,67 @@
 // services/authService.ts
-import User from '../models/User';
-import Customer from '../models/Customer';
-import Role from '../models/Role';
+import db from '../models';
 import { AppError } from '../middleware/errorHandler';
-import { generateToken } from '../middleware/auth';
+import jwt from 'jsonwebtoken';
 import logger from '../config/logger';
 import sequelize from '../config/db';
+import config from '../config/env';
+
+// Get the models from db object
+const User = db.User;
+const Customer = db.Customer;
+const Role = db.Role;
+
+// Define interfaces for models
+interface RoleInstance {
+  id: number;
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+interface UserInstance {
+  id: number;
+  username: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  isActive: boolean;
+  lastLogin?: Date;
+  validatePassword: (password: string) => Promise<boolean>;
+  update: (data: any) => Promise<any>;
+  $add: (relation: string, instances: any[], options?: any) => Promise<any>;
+  $get: (relation: string) => Promise<any[]>;
+}
+
+interface CustomerInstance {
+  id: number;
+  username: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  isActive: boolean;
+  lastLogin?: Date;
+  validatePassword: (password: string) => Promise<boolean>;
+  update: (data: any) => Promise<any>;
+}
+
+/**
+ * Generate JWT token
+ */
+const generateToken = (userId: number): string => {
+  const payload = { id: userId };
+  const secret = config.jwt.secret;
+  
+  // Explicitly type the options to satisfy TypeScript
+  const options: jwt.SignOptions = {
+    expiresIn: config.jwt.expiresIn as jwt.SignOptions["expiresIn"]
+  };
+  
+  return jwt.sign(payload, secret, options);
+};
 
 /**
  * Interface for user registration data
@@ -117,7 +173,7 @@ export const registerUser = async (userData: RegisterUserData): Promise<AuthResp
         email: user.email,
         firstName: user.firstName || undefined,
         lastName: user.lastName || undefined,
-        roles: roles.map((r: Role) => r.name),
+        roles: roles.map((r: RoleInstance) => r.name),
       },
       token
     };
@@ -231,7 +287,7 @@ export const login = async (loginData: LoginData): Promise<AuthResponse> => {
       
       // Get roles
       const userRoles = await user.$get('roles');
-      roles = userRoles.map((role: Role) => role.name);
+      roles = userRoles.map((role: RoleInstance) => role.name);
       
       // Update last login
       await user.update({ lastLogin: new Date() });

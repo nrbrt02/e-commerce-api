@@ -25,6 +25,29 @@ interface JwtPayload {
 }
 
 /**
+ * Generate a JWT token
+ */
+export const generateToken = (userId: number, role: string = 'customer'): string => {
+  const payload = { id: userId, role };
+  const secret = config.jwt.secret;
+  
+  // Explicitly type the options to satisfy TypeScript
+  const options: jwt.SignOptions = {
+    expiresIn: config.jwt.expiresIn as jwt.SignOptions["expiresIn"]
+  };
+  
+  return jwt.sign(payload, secret, options);
+};
+
+/**
+ * Authenticate middleware - Check if user is authenticated
+ * Alias for protect to maintain backward compatibility
+ */
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  return protect(req, res, next);
+};
+
+/**
  * Protect routes - Check if user is authenticated
  */
 export const protect = async (req: Request, res: Response, next: NextFunction) => {
