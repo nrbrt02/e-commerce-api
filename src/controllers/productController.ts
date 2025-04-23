@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
 import { Op } from 'sequelize';
@@ -180,6 +180,21 @@ export const getProductById = asyncHandler(async (req: Request, res: Response) =
   });
 });
 
+export const debugAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  console.log('=== DEBUG AUTH INFO ===');
+  console.log('Auth Header:', req.headers.authorization ? 'Present' : 'Missing');
+  console.log('User Object:', req.user ? 'Present' : 'Missing');
+  
+  if (req.user) {
+    console.log('User ID:', req.user.id);
+    console.log('User Email:', req.user.email);
+  }
+  
+  console.log('Request Body supplierId:', req.body.supplierId);
+  console.log('=======================');
+  
+  next();
+};
 /**
  * Create a new product
  * @route POST /api/products

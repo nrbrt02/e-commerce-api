@@ -4,14 +4,25 @@ import { authenticate } from '../middleware/auth';
 
 const router = express.Router();
 
-// Get public wishlist
-router.get('/:id', wishlistController.getWishlistById);
-
-// Protected routes
+// Apply authentication to all routes
+// The authentication middleware should already be set up to handle auth errors
 router.use(authenticate);
+
+// Define all routes
+router.get('/auth-check', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Authentication successful',
+    user: {
+      id: req.user.id,
+      role: req.user.role
+    }
+  });
+});
 
 // Wishlist routes
 router.get('/', wishlistController.getCustomerWishlists);
+router.get('/:id', wishlistController.getWishlistById);
 router.post('/', wishlistController.createWishlist);
 router.put('/:id', wishlistController.updateWishlist);
 router.delete('/:id', wishlistController.deleteWishlist);

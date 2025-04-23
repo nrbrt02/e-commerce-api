@@ -6,6 +6,13 @@ import logger from '../config/logger';
 // Extract User and Role from your models
 const { User, Role } = models;
 
+// Define Role interface to fix typing issues
+interface RoleWithPermissions {
+  id: number;
+  name: string;
+  permissions: string[];
+}
+
 /**
  * Middleware to check if user has required roles
  * @param roles Array of role names required for access
@@ -25,10 +32,11 @@ export const hasRole = (roles: string[]) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      const userRoles = await user.$get('roles') as typeof Role[];
-      const roleNames = userRoles.map(role => role.name);
+      // Use getRoles() instead of $get('roles')
+      const userRoles = await user.getRoles();
+      const roleNames = userRoles.map((role: { name: string }) => role.name);
 
-      const hasRequiredRole = roles.some(role => roleNames.includes(role));
+      const hasRequiredRole = roles.some((role: string) => roleNames.includes(role));
 
       if (!hasRequiredRole) {
         return res.status(403).json({ 
@@ -63,15 +71,16 @@ export const hasPermission = (requiredPermissions: string[]) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      const userRoles = await user.$get('roles') as typeof Role[];
+      // Use getRoles() instead of $get('roles')
+      const userRoles = await user.getRoles() as RoleWithPermissions[];
       
       // Collect all permissions from all user roles
-      const userPermissions = userRoles.reduce((allPermissions: string[], role) => {
+      const userPermissions = userRoles.reduce((allPermissions: string[], role: RoleWithPermissions) => {
         return [...allPermissions, ...role.permissions];
       }, []);
 
       // Check if user has any of the required permissions
-      const hasRequiredPermission = requiredPermissions.some(permission => 
+      const hasRequiredPermission = requiredPermissions.some((permission: string) => 
         userPermissions.includes(permission)
       );
 

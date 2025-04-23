@@ -3,7 +3,7 @@ import models from '../models';
 import config from '../config/env';
 import logger from '../config/logger';
 
-const { User, Role, UserRole } = models;
+const { User, Role } = models;
 
 // Define basic permissions for the system
 const permissions = [
@@ -146,11 +146,8 @@ const createSuperadminUser = async () => {
         // Check if role is already assigned
         const hasRole = await existingUser.hasRole('superadmin');
         if (!hasRole) {
-          // Use the direct UserRole association
-          await UserRole.create({
-            userId: existingUser.id,
-            roleId: superadminRole.id
-          });
+          // Use the addRole association method instead of direct UserRole.create
+          await existingUser.addRole(superadminRole);
           logger.info('Assigned superadmin role to existing user');
         }
       }
@@ -166,11 +163,8 @@ const createSuperadminUser = async () => {
     // Assign superadmin role to user
     const superadminRole = await Role.findOne({ where: { name: 'superadmin' } });
     if (superadminRole) {
-      // Use the direct UserRole association
-      await UserRole.create({
-        userId: user.id,
-        roleId: superadminRole.id
-      });
+      // Use the addRole association method instead of direct UserRole.create
+      await user.addRole(superadminRole);
       logger.info('Assigned superadmin role to user');
     }
     

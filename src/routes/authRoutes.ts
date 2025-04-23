@@ -6,7 +6,8 @@ import {
   getCurrentUser, 
   updateAuthPassword as updatePassword, 
   forgotPassword, 
-  resetPassword 
+  resetPassword,
+  customerLogin 
 } from '../controllers';
 import { protect } from '../middleware/auth';
 
@@ -16,7 +17,7 @@ const router = express.Router();
 router.post('/register', registerAdmin); // For admin/supplier registration
 router.post('/customer/register', registerCustomer); // For customer registration
 router.post('/login', login);
-router.post('/customer/login', login);
+router.post('/customer/login', customerLogin);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 

@@ -15,6 +15,7 @@ import defineReviewModel, { Review } from './Review';
 import defineRoleModel, { Role } from './Role';
 import defineUserModel, { User } from './User';
 import defineWishlistModel, { Wishlist } from './Wishlist';
+import defineWishlistItemModel, { WishlistItem } from './WishlistItem';
 
 import config from '../config/db';
 
@@ -35,13 +36,13 @@ try {
   models.Order = defineOrderModel(sequelize);
   models.OrderItem = defineOrderItemModel(sequelize);
   models.Wishlist = defineWishlistModel(sequelize);
-
-
+  models.WishlistItem = defineWishlistItemModel(sequelize); // Add WishlistItem model initialization
 
   // Create junction tables for many-to-many relationships
-  const UserRole = sequelize.define('UserRole', {}, { timestamps: false });
-  const ProductCategory = sequelize.define('ProductCategory', {}, { timestamps: false });
-  const WishlistItem = sequelize.define('WishlistItem', {}, { timestamps: false });
+  models.UserRole = sequelize.define('UserRole', {}, { tableName: 'UserRoles', timestamps: false });
+  models.ProductCategory = sequelize.define('ProductCategory', {}, { timestamps: false });
+  // Remove the empty WishlistItem definition since we now have a proper model
+  // models.WishlistItem = sequelize.define('WishlistItem', {}, { timestamps: false });
 
   // Setup associations
   // Address associations
@@ -54,8 +55,8 @@ try {
 
   // Product associations
   models.Product.belongsTo(models.User, { as: 'supplier', foreignKey: 'supplierId' });
-  models.Product.belongsToMany(models.Category, { through: ProductCategory, as: 'categories' });
-  models.Category.belongsToMany(models.Product, { through: ProductCategory, as: 'products' });
+  models.Product.belongsToMany(models.Category, { through: models.ProductCategory, as: 'categories' });
+  models.Category.belongsToMany(models.Product, { through: models.ProductCategory, as: 'products' });
 
   // ProductImage associations
   models.ProductImage.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
@@ -75,14 +76,34 @@ try {
   models.OrderItem.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
 
   // User-Role associations
-  models.User.belongsToMany(models.Role, { through: UserRole, as: 'roles' });
-  models.Role.belongsToMany(models.User, { through: UserRole, as: 'users' });
+  models.User.belongsToMany(models.Role, { through: models.UserRole, as: 'roles' });
+  models.Role.belongsToMany(models.User, { through: models.UserRole, as: 'users' });
 
   // Wishlist associations
   models.Wishlist.belongsTo(models.Customer, { foreignKey: 'customerId', as: 'customer' });
   models.Customer.hasMany(models.Wishlist, { foreignKey: 'customerId', as: 'wishlists' });
-  models.Wishlist.belongsToMany(models.Product, { through: WishlistItem, as: 'products' });
-  models.Product.belongsToMany(models.Wishlist, { through: WishlistItem, as: 'wishlists' });
+  
+  // Updated Wishlist-Product many-to-many relationship with explicit through model
+  models.Wishlist.belongsToMany(models.Product, { 
+    through: models.WishlistItem,
+    foreignKey: 'wishlistId', 
+    otherKey: 'productId',
+    as: 'products' 
+  });
+  
+  models.Product.belongsToMany(models.Wishlist, { 
+    through: models.WishlistItem,
+    foreignKey: 'productId', 
+    otherKey: 'wishlistId',
+    as: 'wishlists' 
+  });
+  
+  // Add explicit associations for WishlistItem to enable easier queries
+  models.WishlistItem.belongsTo(models.Wishlist, { foreignKey: 'wishlistId' });
+  models.Wishlist.hasMany(models.WishlistItem, { foreignKey: 'wishlistId' });
+  
+  models.WishlistItem.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
+  models.Product.hasMany(models.WishlistItem, { foreignKey: 'productId' });
 
   // Helper functions for model hooks
   // Implement the updateProductRating function for the Review hooks

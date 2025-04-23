@@ -15,6 +15,9 @@ import userRoutes from './src/routes/userRoutes';
 import authRoutes from './src/routes/authRoutes';
 import productRoutes from './src/routes/productRoutes';
 import categoryRoutes from './src/routes/categoryRoutes';
+import customerRoutes from './src/routes/customerRoutes';
+import wishlistRoutes from './src/routes/wishlistRoutes';
+import orderRoutes from './src/routes/orderRoutes';
 
 // Middleware
 import { errorHandler } from './src/middleware/errorHandler';
@@ -50,6 +53,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/wishlists', wishlistRoutes);
+app.use('/api/orders', orderRoutes);
 
 // ✅ Global error handling
 app.use(errorHandler);

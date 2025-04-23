@@ -93,6 +93,56 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 };
 
 /**
+ * Optional authentication middleware
+ * Unlike the standard authenticate middleware, this won't return an error if no token is provided
+ * It will still validate the token if one is provided
+ */
+export const optionalAuthenticate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let token: string | undefined;
+
+    // Check if token exists in headers
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    // If no token exists, just continue without authentication
+    if (!token) {
+      return next();
+    }
+
+    // Verify token
+    const secretKey: Secret = config.jwt.secret;
+    const decoded = jwt.verify(token, secretKey) as JwtPayload;
+
+    // Check if user still exists
+    const Model = decoded.role === 'admin' ? User : Customer;
+    const currentUser = await Model.findByPk(decoded.id);
+
+    if (!currentUser) {
+      // If user doesn't exist, just continue without authentication
+      return next();
+    }
+
+    // Check if user is active
+    if (!currentUser.isActive) {
+      // If user is not active, just continue without authentication
+      return next();
+    }
+
+    // Attach user to request
+    req.user = currentUser;
+    // Also attach the role from the token
+    req.user.role = decoded.role;
+
+    next();
+  } catch (error) {
+    // Even if token verification fails, just continue without authentication
+    // This allows the route handler to decide how to handle unauthenticated users
+    return next();
+  }
+};
+/**
  * Restrict routes to specific roles
  */
 export const restrictTo = (...roles: string[]) => {
@@ -125,4 +175,5 @@ export const restrictTo = (...roles: string[]) => {
       return next();
     }
   };
+  
 };

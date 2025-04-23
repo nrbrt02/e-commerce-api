@@ -37,10 +37,10 @@ export const registerAdmin = asyncHandler(async (req: Request, res: Response) =>
   const user = await User.create({
     username,
     email,
-    password, // Will be hashed by model hook
+    password,
     firstName,
     lastName,
-    isVerified: true, // Admin users might be verified by default
+    isVerified: true,
     isActive: true,
     lastLogin: new Date()
   });
@@ -145,49 +145,44 @@ export const registerCustomer = asyncHandler(async (req: Request, res: Response)
  * @access Public
  */
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password, userType = 'customer' } = req.body;
+  const { email, password } = req.body;
   
-  // Validate required fields
   if (!email || !password) {
     throw new AppError('Please provide email and password', 400);
   }
   
-  // Determine model based on user type
-  const Model = userType === 'admin' ? User : Customer;
+  const Model = User;
   
-  // Find user by email
   const user = await Model.findOne({ 
     where: { email },
-    include: userType === 'admin' ? [{ model: Role, as: 'roles', through: { attributes: [] } }] : [],
+    include: [{ model: Role, as: 'roles', through: { attributes: [] } }],
   });
   
   if (!user) {
     throw new AppError('Invalid credentials', 401);
   }
   
-  // Check if user is active
   if (!user.isActive) {
     throw new AppError('Your account is inactive. Please contact support.', 401);
   }
-  
-  // Validate password
   const isPasswordValid = await user.validatePassword(password);
   if (!isPasswordValid) {
     throw new AppError('Invalid credentials', 401);
   }
   
-  // Update last login timestamp
   user.lastLogin = new Date();
   await user.save();
   
-  // Generate JWT token - Fixed typing issue with expiresIn
   const secretKey: Secret = config.jwt.secret;
   const signOptions: SignOptions = { 
     expiresIn: config.jwt.expiresIn as any // Type assertion to fix the error
   };
   
+  const userRoles = user.roles.map((role: { name: string }) => role.name);
+  const role = userRoles.includes('superadmin') ? 'superadmin' : 'admin';
+  
   const token = jwt.sign(
-    { id: user.id, role: userType },
+    { id: user.id, role },
     secretKey,
     signOptions
   );
@@ -305,6 +300,67 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
     message: 'If your email exists in our system, you will receive a reset link shortly',
     // In development, return token for testing
     ...(process.env.NODE_ENV === 'development' && { resetToken }),
+  });
+});
+
+/**
+ * Customer login
+ * @route POST /api/auth/customer/login
+ * @access Public
+ */
+export const customerLogin = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  
+  // Validate required fields
+  if (!email || !password) {
+    throw new AppError('Please provide email and password', 400);
+  }
+  
+  // Find customer by email
+  const customer = await Customer.findOne({ 
+    where: { email },
+  });
+  
+  if (!customer) {
+    throw new AppError('Invalid credentials', 401);
+  }
+  
+  // Check if customer is active
+  if (!customer.isActive) {
+    throw new AppError('Your account is inactive. Please contact support.', 401);
+  }
+  
+  // Validate password
+  const isPasswordValid = await customer.validatePassword(password);
+  if (!isPasswordValid) {
+    throw new AppError('Invalid credentials', 401);
+  }
+  
+  // Update last login timestamp
+  customer.lastLogin = new Date();
+  await customer.save();
+  
+  // Generate JWT token
+  const secretKey: Secret = config.jwt.secret;
+  const signOptions: SignOptions = { 
+    expiresIn: config.jwt.expiresIn as any // Type assertion to fix the error
+  };
+  
+  const token = jwt.sign(
+    { id: customer.id, role: 'customer' },
+    secretKey,
+    signOptions
+  );
+  
+  // Remove password from response
+  const customerData = customer.toJSON();
+  
+  res.status(200).json({
+    status: 'success',
+    token,
+    data: {
+      customer: customerData,
+    },
   });
 });
 
