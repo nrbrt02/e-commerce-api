@@ -5,10 +5,9 @@ import { authenticate } from '../middleware/auth';
 const router = express.Router();
 
 // Apply authentication to all routes
-// The authentication middleware should already be set up to handle auth errors
 router.use(authenticate);
 
-// Define all routes
+// Auth check route
 router.get('/auth-check', (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -20,17 +19,26 @@ router.get('/auth-check', (req, res) => {
   });
 });
 
-// Wishlist routes
+// Default wishlist routes
+router.get('/default', wishlistController.getDefaultWishlist);
+router.post('/default/items', wishlistController.addProductToWishlist);
+router.delete('/default/items/:itemId', wishlistController.removeProductFromWishlist);
+router.put('/default/items/:itemId', wishlistController.updateWishlistItemNotes);
+
+// Specific wishlist routes
 router.get('/', wishlistController.getCustomerWishlists);
-router.get('/:id', wishlistController.getWishlistById);
 router.post('/', wishlistController.createWishlist);
+router.get('/:id', wishlistController.getWishlistById);
 router.put('/:id', wishlistController.updateWishlist);
 router.delete('/:id', wishlistController.deleteWishlist);
 
-// Wishlist item routes
+// Specific wishlist item routes
 router.post('/:id/items', wishlistController.addProductToWishlist);
 router.delete('/:id/items/:itemId', wishlistController.removeProductFromWishlist);
 router.put('/:id/items/:itemId', wishlistController.updateWishlistItemNotes);
 router.post('/:id/items/:itemId/move', wishlistController.moveProductToAnotherWishlist);
+
+// Set default wishlist
+router.post('/:id/set-default', wishlistController.setDefaultWishlist);
 
 export default router;

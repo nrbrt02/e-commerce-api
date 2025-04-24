@@ -2,28 +2,28 @@ import express from 'express';
 import { 
   registerAdmin,
   registerCustomer, 
-  login, 
   getCurrentUser, 
-  updateAuthPassword as updatePassword, 
+  updateAuthPassword,
   forgotPassword, 
   resetPassword,
-  customerLogin 
-} from '../controllers';
+  customerLogin,
+  login 
+} from '../controllers/authController';
 import { protect } from '../middleware/auth';
 
 const router = express.Router();
 
 // Public routes
-router.post('/register', registerAdmin); // For admin/supplier registration
-router.post('/customer/register', registerCustomer); // For customer registration
+router.post('/register', registerAdmin);
+router.post('/customer/register', registerCustomer);
 router.post('/login', login);
 router.post('/customer/login', customerLogin);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
 // Protected routes
-router.use(protect); // Middleware to protect routes below
+router.use(protect);
 router.get('/me', getCurrentUser);
-router.patch('/update-password', updatePassword);
+router.patch('/update-password', updateAuthPassword);
 
 export default router;

@@ -22,27 +22,50 @@ interface AuthenticatedRequest extends Request {
  */
 export const getCustomerWishlists = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
-    const wishlists = await Wishlist.findAll({
-      where: {
-        customerId: req.user!.id,
-      },
-      include: [
-        {
-          model: Product,
-          as: "products",
-          through: { attributes: [] }, // Don't include junction table attributes directly
-          attributes: ["id", "name", "price", "imageUrls"],
+    try {
+      // Get all wishlists for the authenticated customer
+      const wishlists = await Wishlist.findAll({
+        where: {
+          customerId: req.user!.id,
         },
-      ],
-    });
+      });
 
-    res.status(200).json({
-      status: "success",
-      results: wishlists.length,
-      data: {
-        wishlists,
-      },
-    });
+      // For each wishlist, get the items and products separately
+      const wishlistsWithItems = await Promise.all(
+        wishlists.map(async (wishlist: typeof Wishlist.prototype) => {
+          // Get wishlist items with products
+          const items = await WishlistItem.findAll({
+            where: { wishlistId: wishlist.id },
+            include: [
+              {
+                model: Product,
+                as: "product",
+                attributes: ["id", "name", "price", "imageUrls"],
+              },
+            ],
+          });
+
+          // Return wishlist with items
+          return {
+            ...wishlist.get({ plain: true }),
+            items: items.map((item: WishlistItemType) =>
+              item.get({ plain: true })
+            ),
+          };
+        })
+      );
+
+      res.status(200).json({
+        status: "success",
+        results: wishlistsWithItems.length,
+        data: {
+          wishlists: wishlistsWithItems,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching customer wishlists:", error);
+      throw error;
+    }
   }
 );
 
@@ -53,81 +76,93 @@ export const getCustomerWishlists = asyncHandler(
  */
 export const getWishlistByIdDebug = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
-    // Step 1: Try to find the wishlist without any includes first
-    const simpleWishlist = await Wishlist.findByPk(req.params.id);
+    try {
+      // Step 1: Try to find the wishlist without any includes first
+      const simpleWishlist = await Wishlist.findByPk(req.params.id);
+      console.log(
+        "Simple wishlist query result:",
+        simpleWishlist ? "Found" : "Not found"
+      );
 
-    // Log the result of the simple query
-    console.log(
-      "Simple wishlist query result:",
-      simpleWishlist ? "Found" : "Not found"
-    );
-
-    if (simpleWishlist) {
-      console.log("Wishlist data:", {
-        id: simpleWishlist.id,
-        name: simpleWishlist.name,
-        customerId: simpleWishlist.customerId,
-        isPublic: simpleWishlist.isPublic,
-      });
-    }
-
-    // Step 2: Try to find the customer if the wishlist exists
-    let customer = null;
-    if (simpleWishlist) {
-      customer = await Customer.findByPk(simpleWishlist.customerId);
-      console.log("Customer query result:", customer ? "Found" : "Not found");
-    }
-
-    // Step 3: Try to find associated products
-    let products: any[] = [];
-    if (simpleWishlist) {
-      try {
-        // Get associated products through WishlistItem
-        const wishlistItems = await WishlistItem.findAll({
-          where: { wishlistId: simpleWishlist.id },
-          include: [
-            {
-              model: Product,
-              as: "product",
-              attributes: ["id", "name", "price", "imageUrls"],
-            },
-          ],
+      if (simpleWishlist) {
+        console.log("Wishlist data:", {
+          id: simpleWishlist.id,
+          name: simpleWishlist.name,
+          customerId: simpleWishlist.customerId,
+          isPublic: simpleWishlist.isPublic,
         });
-
-        products = wishlistItems.map((item: any) => item.product);
-        console.log(
-          "Products query result:",
-          products.length > 0
-            ? `Found ${products.length} products`
-            : "No products found"
-        );
-      } catch (error) {
-        console.error("Error getting products:", error);
       }
-    }
 
-    // Return all the data we found
-    res.status(200).json({
-      status: "success",
-      debug: true,
-      data: {
-        wishlistExists: !!simpleWishlist,
-        wishlistData: simpleWishlist,
-        customerExists: !!customer,
-        customerData: customer,
-        productsCount: products.length,
-        products: products,
-        userAuthenticated: !!req.user,
-        userInfo: req.user
-          ? {
-              id: req.user.id,
-              isCustomerMatch: simpleWishlist
-                ? req.user.id === simpleWishlist.customerId
-                : false,
-            }
-          : null,
-      },
-    });
+      // Step 2: Try to find the customer if the wishlist exists
+      let customer = null;
+      if (simpleWishlist) {
+        customer = await Customer.findByPk(simpleWishlist.customerId);
+        console.log("Customer query result:", customer ? "Found" : "Not found");
+      }
+
+      // Step 3: Try to find associated items and products
+      let items: WishlistItemType[] = [];
+      let products: any[] = [];
+
+      if (simpleWishlist) {
+        try {
+          // Get associated items with products
+          items = await WishlistItem.findAll({
+            where: { wishlistId: simpleWishlist.id },
+            include: [
+              {
+                model: Product,
+                as: "product",
+                attributes: ["id", "name", "price", "imageUrls"],
+              },
+            ],
+          });
+
+          // Extract products from items for convenience
+          products = items.map((item: WishlistItemType) => item.get("product"));
+          console.log(
+            "Products query result:",
+            products.length > 0
+              ? `Found ${products.length} products`
+              : "No products found"
+          );
+        } catch (error) {
+          console.error("Error getting products:", error);
+        }
+      }
+
+      // Return all the data we found
+      res.status(200).json({
+        status: "success",
+        debug: true,
+        data: {
+          wishlistExists: !!simpleWishlist,
+          wishlistData: simpleWishlist
+            ? simpleWishlist.get({ plain: true })
+            : null,
+          customerExists: !!customer,
+          customerData: customer ? customer.get({ plain: true }) : null,
+          itemsCount: items.length,
+          items: items.map((item: WishlistItemType) =>
+            item.get({ plain: true })
+          ),
+          productsCount: products.length,
+          products: products,
+          userAuthenticated: !!req.user,
+          userInfo: req.user
+            ? {
+                id: req.user.id,
+                isCustomerMatch: simpleWishlist
+                  ? req.user.id === simpleWishlist.customerId
+                  : false,
+              }
+            : null,
+        },
+      });
+    } catch (error) {
+      console.error("Error in debug function:", error);
+      throw error;
+    }
   }
 );
 
@@ -234,20 +269,25 @@ export const createWishlist = asyncHandler(
       throw new AppError("Wishlist name is required", 400);
     }
 
-    // Create wishlist
-    const wishlist = await Wishlist.create({
-      customerId: req.user!.id,
-      name,
-      description,
-      isPublic: isPublic !== undefined ? isPublic : false,
-    });
+    try {
+      // Create wishlist
+      const wishlist = await Wishlist.create({
+        customerId: req.user!.id,
+        name,
+        description,
+        isPublic: isPublic !== undefined ? isPublic : false,
+      });
 
-    res.status(201).json({
-      status: "success",
-      data: {
-        wishlist,
-      },
-    });
+      res.status(201).json({
+        status: "success",
+        data: {
+          wishlist: wishlist.get({ plain: true }),
+        },
+      });
+    } catch (error) {
+      console.error("Error creating wishlist:", error);
+      throw error;
+    }
   }
 );
 
@@ -260,34 +300,57 @@ export const updateWishlist = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
     const { name, description, isPublic } = req.body;
 
-    // Find wishlist
-    const wishlist = await Wishlist.findByPk(req.params.id);
+    try {
+      // Find wishlist
+      const wishlist = await Wishlist.findByPk(req.params.id);
 
-    if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
+      if (!wishlist) {
+        throw new AppError("Wishlist not found", 404);
+      }
+
+      // Check if wishlist belongs to authenticated customer
+      if (wishlist.customerId !== req.user!.id) {
+        throw new AppError(
+          "You do not have permission to update this wishlist",
+          403
+        );
+      }
+
+      // Update wishlist
+      if (name) wishlist.name = name;
+      if (description !== undefined) wishlist.description = description;
+      if (isPublic !== undefined) wishlist.isPublic = isPublic;
+
+      await wishlist.save();
+
+      // Get items for the wishlist
+      const items = await WishlistItem.findAll({
+        where: { wishlistId: wishlist.id },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "price", "imageUrls"],
+          },
+        ],
+      });
+
+      // Return updated wishlist with items
+      const updatedWishlistData = {
+        ...wishlist.get({ plain: true }),
+        items: items.map((item: WishlistItemType) => item.get({ plain: true })),
+      };
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          wishlist: updatedWishlistData,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating wishlist:", error);
+      throw error;
     }
-
-    // Check if wishlist belongs to authenticated customer
-    if (wishlist.customerId !== req.user!.id) {
-      throw new AppError(
-        "You do not have permission to update this wishlist",
-        403
-      );
-    }
-
-    // Update wishlist
-    if (name) wishlist.name = name;
-    if (description !== undefined) wishlist.description = description;
-    if (isPublic !== undefined) wishlist.isPublic = isPublic;
-
-    await wishlist.save();
-
-    res.status(200).json({
-      status: "success",
-      data: {
-        wishlist,
-      },
-    });
   }
 );
 
@@ -298,28 +361,180 @@ export const updateWishlist = asyncHandler(
  */
 export const deleteWishlist = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
-    const wishlist = await Wishlist.findByPk(req.params.id);
+    try {
+      const wishlist = await Wishlist.findByPk(req.params.id);
 
-    if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
+      if (!wishlist) {
+        throw new AppError("Wishlist not found", 404);
+      }
+
+      // Check if wishlist belongs to authenticated customer
+      if (wishlist.customerId !== req.user!.id) {
+        throw new AppError(
+          "You do not have permission to delete this wishlist",
+          403
+        );
+      }
+
+      await wishlist.destroy();
+
+      res.status(200).json({
+        status: "success",
+        data: null,
+      });
+    } catch (error) {
+      console.error("Error deleting wishlist:", error);
+      throw error;
     }
-
-    // Check if wishlist belongs to authenticated customer
-    if (wishlist.customerId !== req.user!.id) {
-      throw new AppError(
-        "You do not have permission to delete this wishlist",
-        403
-      );
-    }
-
-    await wishlist.destroy();
-
-    res.status(200).json({
-      status: "success",
-      data: null,
-    });
   }
 );
+
+/**
+ * Add product to wishlist
+ * @route POST /api/wishlists/:id/items
+ * @access Private (Customer)
+ */
+/**
+ * Add product to wishlist
+ * @route POST /api/wishlists/:id/items
+ * @access Private (Customer)
+ */
+/**
+ * Add product to wishlist
+ * @route POST /api/wishlists/:id/items
+ * @access Private (Customer)
+ */
+
+/**
+ * Get the default wishlist for the authenticated customer
+ * @route GET /api/wishlists/default
+ * @access Private (Customer)
+ */
+export const getDefaultWishlist = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Get the customer with their default wishlist
+      const customer = await Customer.findByPk(req.user!.id);
+      
+      if (!customer) {
+        throw new AppError("Customer not found", 404);
+      }
+      
+      let wishlist;
+      
+      // Check if customer has a default wishlist
+      if (customer.defaultWishlistId) {
+        wishlist = await Wishlist.findByPk(customer.defaultWishlistId);
+      }
+      
+      // If no default wishlist found, get the first wishlist or create one
+      if (!wishlist) {
+        // Try to find any wishlist for the customer
+        wishlist = await Wishlist.findOne({
+          where: { customerId: req.user!.id }
+        });
+        
+        // If still no wishlist, create a default one
+        if (!wishlist) {
+          let wishlistName = "My Wishlist";
+          if (customer.firstName && customer.lastName) {
+            wishlistName = `${customer.firstName} ${customer.lastName}'s Wishlist`;
+          } else if (customer.firstName) {
+            wishlistName = `${customer.firstName}'s Wishlist`;
+          } else if (customer.username) {
+            wishlistName = `${customer.username}'s Wishlist`;
+          }
+          
+          wishlist = await Wishlist.create({
+            customerId: req.user!.id,
+            name: wishlistName,
+            description: "Default wishlist",
+            isPublic: false,
+          });
+          
+          // Update the customer with the new default wishlist ID
+          await customer.update({ defaultWishlistId: wishlist.id });
+        } else {
+          // Update the customer with this wishlist as default
+          await customer.update({ defaultWishlistId: wishlist.id });
+        }
+      }
+      
+      // Get items for the wishlist
+      const items = await WishlistItem.findAll({
+        where: { wishlistId: wishlist.id },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "price", "imageUrls"],
+          },
+        ],
+      });
+      
+      // Return the default wishlist with items
+      const wishlistData = {
+        ...wishlist.get({ plain: true }),
+        items: items.map((item: WishlistItemType) => item.get({ plain: true })),
+        isDefault: true
+      };
+      
+      res.status(200).json({
+        status: "success",
+        data: {
+          wishlist: wishlistData,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching default wishlist:", error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Set a wishlist as the default for the authenticated customer
+ * @route POST /api/wishlists/:id/set-default
+ * @access Private (Customer)
+ */
+export const setDefaultWishlist = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Find the wishlist
+      const wishlist = await Wishlist.findOne({
+        where: {
+          id: req.params.id,
+          customerId: req.user!.id,
+        },
+      });
+      
+      if (!wishlist) {
+        throw new AppError("Wishlist not found", 404);
+      }
+      
+      // Update the customer's default wishlist ID
+      await Customer.update(
+        { defaultWishlistId: wishlist.id },
+        { where: { id: req.user!.id } }
+      );
+      
+      res.status(200).json({
+        status: "success",
+        data: {
+          wishlist: {
+            id: wishlist.id,
+            name: wishlist.name,
+            isDefault: true
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error setting default wishlist:", error);
+      throw error;
+    }
+  }
+);
+
 
 /**
  * Add product to wishlist
@@ -329,67 +544,129 @@ export const deleteWishlist = asyncHandler(
 export const addProductToWishlist = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
     const { productId, notes } = req.body;
+    let wishlist;
+    let isNewlyCreated = false;
 
     // Validate product ID
     if (!productId) {
       throw new AppError("Product ID is required", 400);
     }
 
-    // Check if product exists
-    const product = await Product.findByPk(productId);
+    try {
+      // Check if product exists
+      const product = await Product.findByPk(productId);
 
-    if (!product) {
-      throw new AppError("Product not found", 404);
-    }
+      if (!product) {
+        throw new AppError("Product not found", 404);
+      }
 
-    // Check if wishlist exists and belongs to authenticated customer
-    const wishlist = await Wishlist.findOne({
-      where: {
-        id: req.params.id,
-        customerId: req.user!.id,
-      },
-    });
+      // First, check if a specific wishlist ID was provided and it belongs to the user
+      if (req.params.id !== 'default') {
+        wishlist = await Wishlist.findOne({
+          where: {
+            id: req.params.id,
+            customerId: req.user!.id,
+          },
+        });
+      }
 
-    if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
-    }
+      // If no specific wishlist was found, get the customer's default wishlist
+      if (!wishlist) {
+        const customer = await Customer.findByPk(req.user!.id);
+        
+        if (customer && customer.defaultWishlistId) {
+          wishlist = await Wishlist.findByPk(customer.defaultWishlistId);
+        }
+      }
 
-    // Check if product already in wishlist
-    const existingItem = await WishlistItem.findOne({
-      where: {
+      // If still no wishlist, create a new one for the user
+      if (!wishlist) {
+        // Get customer info for wishlist name
+        const customer = await Customer.findByPk(req.user!.id, {
+          attributes: ['firstName', 'lastName', 'email', 'username'],
+        });
+        
+        // Create wishlist name based on customer info
+        let wishlistName = "My Wishlist";
+        if (customer) {
+          if (customer.firstName && customer.lastName) {
+            wishlistName = `${customer.firstName} ${customer.lastName}'s Wishlist`;
+          } else if (customer.firstName) {
+            wishlistName = `${customer.firstName}'s Wishlist`;
+          } else if (customer.username) {
+            wishlistName = `${customer.username}'s Wishlist`;
+          } else if (customer.email) {
+            wishlistName = `${customer.email}'s Wishlist`;
+          }
+        }
+        
+        // Create new wishlist
+        wishlist = await Wishlist.create({
+          name: wishlistName,
+          customerId: req.user!.id,
+          description: "Automatically created wishlist"
+        });
+        
+        // Update customer's default wishlist reference
+        await Customer.update(
+          { defaultWishlistId: wishlist.id },
+          { where: { id: req.user!.id } }
+        );
+        
+        isNewlyCreated = true;
+        console.log(`Created new wishlist for user: ${req.user!.id}`);
+      }
+
+      // Check if product already in wishlist
+      const existingItem = await WishlistItem.findOne({
+        where: {
+          wishlistId: wishlist.id,
+          productId,
+        },
+      });
+
+      if (existingItem) {
+        throw new AppError("Product already in wishlist", 400);
+      }
+
+      // Add product to wishlist
+      const wishlistItem = await WishlistItem.create({
         wishlistId: wishlist.id,
         productId,
-      },
-    });
+        notes,
+      });
 
-    if (existingItem) {
-      throw new AppError("Product already in wishlist", 400);
-    }
+      // Get the complete item with product details
+      const createdItem = await WishlistItem.findByPk(wishlistItem.id, {
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "price", "imageUrls"],
+          },
+        ],
+      });
 
-    // Add product to wishlist
-    const wishlistItem = await WishlistItem.create({
-      wishlistId: wishlist.id,
-      productId,
-      notes,
-    });
+      if (!createdItem) {
+        throw new AppError("Error retrieving created item", 500);
+      }
 
-    // Get the product details to return
-    const itemWithProduct = await WishlistItem.findByPk(wishlistItem.id, {
-      include: [
-        {
-          model: Product,
-          as: "product",
-          attributes: ["id", "name", "price", "imageUrls"],
+      // Return a clean response with plain object
+      res.status(201).json({
+        status: "success",
+        data: {
+          item: createdItem.get({ plain: true }),
+          wishlist: {
+            id: wishlist.id,
+            name: wishlist.name,
+            isNewlyCreated: isNewlyCreated
+          }
         },
-      ],
-    });
-
-    res.status(201).json({
-      status: "success",
-      data: {
-        item: itemWithProduct,
-      },
-    });
+      });
+    } catch (error) {
+      console.error("Error adding product to wishlist:", error);
+      throw error;
+    }
   }
 );
 
@@ -402,37 +679,54 @@ export const removeProductFromWishlist = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
     const { id, itemId } = req.params;
 
-    // Check if wishlist exists and belongs to authenticated customer
-    const wishlist = await Wishlist.findOne({
-      where: {
-        id,
-        customerId: req.user!.id,
-      },
-    });
+    try {
+      // Check if wishlist exists and belongs to authenticated customer
+      const wishlist = await Wishlist.findOne({
+        where: {
+          id,
+          customerId: req.user!.id,
+        },
+      });
 
-    if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
+      if (!wishlist) {
+        throw new AppError("Wishlist not found", 404);
+      }
+
+      // Find wishlist item
+      const wishlistItem = await WishlistItem.findOne({
+        where: {
+          id: itemId,
+          wishlistId: wishlist.id,
+        },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "price", "imageUrls"],
+          },
+        ],
+      });
+
+      if (!wishlistItem) {
+        throw new AppError("Item not found in wishlist", 404);
+      }
+
+      // Store the item data before deleting for response
+      const removedItem = wishlistItem.get({ plain: true });
+
+      // Remove item from wishlist
+      await wishlistItem.destroy();
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          removedItem: removedItem,
+        },
+      });
+    } catch (error) {
+      console.error("Error removing product from wishlist:", error);
+      throw error;
     }
-
-    // Find wishlist item
-    const wishlistItem = await WishlistItem.findOne({
-      where: {
-        id: itemId,
-        wishlistId: wishlist.id,
-      },
-    });
-
-    if (!wishlistItem) {
-      throw new AppError("Item not found in wishlist", 404);
-    }
-
-    // Remove item from wishlist
-    await wishlistItem.destroy();
-
-    res.status(200).json({
-      status: "success",
-      data: null,
-    });
   }
 );
 
@@ -509,16 +803,33 @@ export const moveProductToAnotherWishlist = asyncHandler(
       wishlistItem.wishlistId = targetWishlist.id;
       await wishlistItem.save({ transaction });
 
+      // Fetch the complete updated item with product details
+      const updatedItem = await WishlistItem.findByPk(wishlistItem.id, {
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "price", "imageUrls"],
+          },
+        ],
+        transaction,
+      });
+
       await transaction.commit();
 
       res.status(200).json({
         status: "success",
         data: {
-          item: wishlistItem,
+          item:
+            updatedItem?.get({ plain: true }) ||
+            wishlistItem.get({ plain: true }),
+          sourceWishlistId: sourceWishlist.id,
+          targetWishlistId: targetWishlist.id,
         },
       });
     } catch (error) {
       await transaction.rollback();
+      console.error("Error moving product between wishlists:", error);
       throw error;
     }
   }
@@ -534,39 +845,59 @@ export const updateWishlistItemNotes = asyncHandler(
     const { id, itemId } = req.params;
     const { notes } = req.body;
 
-    // Check if wishlist exists and belongs to authenticated customer
-    const wishlist = await Wishlist.findOne({
-      where: {
-        id,
-        customerId: req.user!.id,
-      },
-    });
+    try {
+      // Check if wishlist exists and belongs to authenticated customer
+      const wishlist = await Wishlist.findOne({
+        where: {
+          id,
+          customerId: req.user!.id,
+        },
+      });
 
-    if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
+      if (!wishlist) {
+        throw new AppError("Wishlist not found", 404);
+      }
+
+      // Find wishlist item
+      const wishlistItem = await WishlistItem.findOne({
+        where: {
+          id: itemId,
+          wishlistId: wishlist.id,
+        },
+      });
+
+      if (!wishlistItem) {
+        throw new AppError("Item not found in wishlist", 404);
+      }
+
+      // Update notes
+      wishlistItem.notes = notes;
+      await wishlistItem.save();
+
+      // Get the updated item with product information
+      const updatedItem = await WishlistItem.findByPk(itemId, {
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name", "price", "imageUrls"],
+          },
+        ],
+      });
+
+      if (!updatedItem) {
+        throw new AppError("Error retrieving updated item", 500);
+      }
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          item: updatedItem.get({ plain: true }),
+        },
+      });
+    } catch (error) {
+      console.error("Error updating wishlist item notes:", error);
+      throw error;
     }
-
-    // Find wishlist item
-    const wishlistItem = await WishlistItem.findOne({
-      where: {
-        id: itemId,
-        wishlistId: wishlist.id,
-      },
-    });
-
-    if (!wishlistItem) {
-      throw new AppError("Item not found in wishlist", 404);
-    }
-
-    // Update notes
-    wishlistItem.notes = notes;
-    await wishlistItem.save();
-
-    res.status(200).json({
-      status: "success",
-      data: {
-        item: wishlistItem,
-      },
-    });
   }
 );

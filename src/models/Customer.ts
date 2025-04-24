@@ -17,6 +17,7 @@ export interface CustomerAttributes {
   lastLogin?: Date;
   addresses?: object[];
   preferences?: object;
+  defaultWishlistId?: number; // Add defaultWishlistId property
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,7 +25,7 @@ export interface CustomerAttributes {
 // Interface for optional attributes during creation
 interface CustomerCreationAttributes extends Optional<CustomerAttributes, 
   'id' | 'firstName' | 'lastName' | 'avatar' | 'phone' | 'isVerified' | 'isActive' | 
-  'lastLogin' | 'addresses' | 'preferences' | 
+  'lastLogin' | 'addresses' | 'preferences' | 'defaultWishlistId' | 
   'createdAt' | 'updatedAt'> {}
 
 // Customer model class
@@ -42,6 +43,7 @@ export class Customer extends Model<CustomerAttributes, CustomerCreationAttribut
   public lastLogin!: Date | undefined;
   public addresses!: object[] | undefined;
   public preferences!: object | undefined;
+  public defaultWishlistId!: number | undefined; // Add defaultWishlistId property
   public createdAt!: Date;
   public updatedAt!: Date;
 
@@ -160,6 +162,14 @@ export default function defineCustomerModel(sequelize: Sequelize): typeof Custom
         type: DataTypes.JSONB,
         allowNull: true,
       },
+      defaultWishlistId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'wishlists',
+          key: 'id',
+        },
+      },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
@@ -185,6 +195,42 @@ export default function defineCustomerModel(sequelize: Sequelize): typeof Custom
             customer.password = await bcrypt.hash(customer.password, config.bcrypt.saltRounds);
           }
         },
+        // Create default wishlist after customer is created
+        afterCreate: async (customer: Customer) => {
+          try {
+            // Import models here to avoid circular dependency
+            const models = require('../models').default;
+            const { Wishlist } = models;
+            
+            // Create a default wishlist for the new customer
+            let wishlistName = "My Wishlist";
+            if (customer.firstName && customer.lastName) {
+              wishlistName = `${customer.firstName} ${customer.lastName}'s Wishlist`;
+            } else if (customer.firstName) {
+              wishlistName = `${customer.firstName}'s Wishlist`;
+            } else if (customer.username) {
+              wishlistName = `${customer.username}'s Wishlist`;
+            }
+            
+            const defaultWishlist = await Wishlist.create({
+              customerId: customer.id,
+              name: wishlistName,
+              description: "Default wishlist",
+              isPublic: false,
+            });
+            
+            // Set the default wishlist ID
+            await customer.update({
+              defaultWishlistId: defaultWishlist.id
+            });
+            
+            console.log(`Created default wishlist for customer ${customer.id}`);
+          } catch (error) {
+            console.error(`Error creating default wishlist for customer ${customer.id}:`, error);
+            // Don't throw the error as it would rollback the customer creation
+            // Just log it and continue
+          }
+        }
       },
     }
   );
