@@ -8,7 +8,8 @@ export enum OrderStatus {
   DELIVERED = 'delivered',
   CANCELLED = 'cancelled',
   REFUNDED = 'refunded',
-  COMPLETED = 'completed'
+  COMPLETED = 'completed',
+  DRAFT = 'draft'
 }
 
 // Define payment status enum
@@ -152,7 +153,6 @@ export default function defineOrderModel(sequelize: Sequelize): typeof Order {
       tableName: 'orders',
       hooks: {
         beforeCreate: (order: Order) => {
-          // Generate order number if not provided
           if (!order.orderNumber) {
             const prefix = 'ORD';
             const timestamp = Date.now().toString();

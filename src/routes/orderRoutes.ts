@@ -6,7 +6,14 @@ import {
   updateOrderStatus,
   updatePaymentStatus,
   cancelOrder,
-  getMyOrders
+  getMyOrders,
+  // Draft-related controllers
+  saveOrderDraft,
+  updateOrderDraft,
+  getMyDraftOrders,
+  getMyDraftOrderById,
+  convertDraftToOrder,
+  deleteOrderDraft
 } from '../controllers';
 import { protect, restrictTo } from '../middleware/auth';
 
@@ -19,6 +26,14 @@ router.use(protect);
 router.get('/my-orders', restrictTo('customer'), getMyOrders);
 router.post('/', restrictTo('customer'), createOrder);
 router.patch('/:id/cancel', cancelOrder); // Both admin and customer can cancel
+
+// Draft-related routes (customer only)
+router.get('/drafts', restrictTo('customer'), getMyDraftOrders);
+router.get('/draft/:id', restrictTo('customer'), getMyDraftOrderById);
+router.post('/draft', restrictTo('customer'), saveOrderDraft);
+router.put('/draft/:id', restrictTo('customer'), updateOrderDraft);
+router.post('/draft/:id/convert', restrictTo('customer'), convertDraftToOrder);
+router.delete('/draft/:id', restrictTo('customer'), deleteOrderDraft);
 
 // Admin routes
 router.get('/', restrictTo('admin'), getOrders);

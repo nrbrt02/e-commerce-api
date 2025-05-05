@@ -1,4 +1,3 @@
-// src/controllers/addressController.ts
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
 import db from '../models';

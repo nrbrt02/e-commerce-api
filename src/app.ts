@@ -11,6 +11,7 @@ import customerRoutes from './routes/customerRoutes';
 import productRoutes from './routes/productRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import orderRoutes from './routes/orderRoutes';
+import addressRoutes from './routes/addressRoutes';
 
 // Create Express app
 const app: Express = express();
@@ -38,8 +39,9 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/addresses', addressRoutes);
 
-// 404 handler
+// 404 handler - This needs to come AFTER all other routes
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ message: 'Resource not found' });
 });

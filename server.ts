@@ -18,6 +18,7 @@ import categoryRoutes from './src/routes/categoryRoutes';
 import customerRoutes from './src/routes/customerRoutes';
 import wishlistRoutes from './src/routes/wishlistRoutes';
 import orderRoutes from './src/routes/orderRoutes';
+import addressRoutes from './src/routes/addressRoutes';
 
 // Middleware
 import { errorHandler } from './src/middleware/errorHandler';
@@ -56,6 +57,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/wishlists', wishlistRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/addresses', addressRoutes);
 
 // ✅ Global error handling
 app.use(errorHandler);

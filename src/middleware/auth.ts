@@ -142,6 +142,7 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
     return next();
   }
 };
+
 /**
  * Restrict routes to specific roles
  */
@@ -175,5 +176,4 @@ export const restrictTo = (...roles: string[]) => {
       return next();
     }
   };
-  
 };

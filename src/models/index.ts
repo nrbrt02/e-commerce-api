@@ -209,5 +209,5 @@ try {
   throw error;
 }
 
-export { sequelize };
+export { models, sequelize };
 export default models;
