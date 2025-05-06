@@ -69,7 +69,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     const decoded = jwt.verify(token, secretKey) as JwtPayload;
 
     // Check if user still exists
-    const Model = decoded.role === 'admin' ? User : Customer;
+    const Model = decoded.role === 'admin' || decoded.role === 'superadmin' ? User : Customer;
     const currentUser = await Model.findByPk(decoded.id);
 
     if (!currentUser) {
@@ -116,7 +116,7 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
     const decoded = jwt.verify(token, secretKey) as JwtPayload;
 
     // Check if user still exists
-    const Model = decoded.role === 'admin' ? User : Customer;
+    const Model = decoded.role === 'admin' || decoded.role === 'superadmin' ? User : Customer;
     const currentUser = await Model.findByPk(decoded.id);
 
     if (!currentUser) {
@@ -148,10 +148,15 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
  */
 export const restrictTo = (...roles: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
+    // Superadmin has access to everything
+    if (req.user.role === 'superadmin') {
+      return next();
+    }
+    
     // Check if the user has the appropriate role
     if (req.user.role === 'admin') {
       // For admin users (staff), check if they have any of the required roles through role-based permissions
-      // Only if roles array specifies particular admin roles (e.g., 'super-admin', 'manager')
+      // Only if roles array specifies particular admin roles (e.g., 'manager')
       if (roles.length > 0 && !roles.includes('admin')) {
         // This is a restricted admin route that requires specific admin roles
         const hasRole = await req.user.hasAnyRole(roles);

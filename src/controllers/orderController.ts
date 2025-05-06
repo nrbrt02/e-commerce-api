@@ -482,6 +482,7 @@ export const updatePaymentStatus = asyncHandler(
 /**
  * Cancel an order
  * @route PATCH /api/orders/:id/cancel
+ * @route PUT /api/orders/:id/cancel
  * @access Private (Admin, Customer)
  */
 export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
@@ -490,6 +491,9 @@ export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
     throw new AppError("Invalid order ID", 400);
   }
 
+  // Extract the cancellation reason from request body (optional)
+  const { reason } = req.body;
+  
   const transaction = await sequelize.transaction();
 
   try {
@@ -554,6 +558,21 @@ export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
     if (order.paymentStatus === PaymentStatus.PAID) {
       order.paymentStatus = PaymentStatus.REFUNDED;
     }
+    
+    // Store cancellation details in metadata
+    const metadata = order.metadata || {};
+    const cancellationDetails = {
+      cancelledAt: new Date(),
+      cancelledBy: req.user.role,
+      cancelledById: req.user.id,
+      reason: reason || 'No reason provided'
+    };
+    
+    // Update metadata with cancellation info
+    order.metadata = {
+      ...metadata,
+      cancellation: cancellationDetails
+    };
 
     await order.save({ transaction });
 
@@ -572,6 +591,7 @@ export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
     throw error;
   }
 });
+
 
 /**
  * Get customer orders
