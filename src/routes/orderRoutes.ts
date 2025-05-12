@@ -27,7 +27,6 @@ router.get('/my-orders', restrictTo('customer'), getMyOrders);
 router.post('/', restrictTo('customer'), createOrder);
 router.patch('/:id/cancel', cancelOrder);
 router.put('/:id/cancel', cancelOrder);
-
 // Draft-related routes (customer only)
 router.get('/drafts', restrictTo('customer'), getMyDraftOrders);
 router.get('/draft/:id', restrictTo('customer'), getMyDraftOrderById);
