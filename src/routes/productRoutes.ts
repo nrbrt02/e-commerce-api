@@ -6,7 +6,8 @@ import {
   updateProduct, 
   deleteProduct,
   getProductReviews,
-  createReview
+  createReview,
+  getProductSearch
 } from '../controllers';
 import * as reviewController from '../controllers/reviewController';
 
@@ -15,6 +16,8 @@ import { protect, restrictTo } from '../middleware/auth';
 const router = express.Router();
 
 // Public routes
+router.get('/search', getProductSearch);
+
 router.get('/', getProducts);
 router.get('/:id', getProductById);
 
