@@ -1,5 +1,4 @@
-// src/models/index.ts
-import { Sequelize } from 'sequelize';
+import { Sequelize, Op } from 'sequelize';
 import sequelize from '../config/db';
 import { logger } from '../utils/logger';
 
@@ -16,6 +15,7 @@ import defineRoleModel, { Role } from './Role';
 import defineUserModel, { User } from './User';
 import defineWishlistModel, { Wishlist } from './Wishlist';
 import defineWishlistItemModel, { WishlistItem } from './WishlistItem';
+import defineSupplierModel, { Supplier } from './Supplier';
 
 import config from '../config/db';
 
@@ -36,13 +36,12 @@ try {
   models.Order = defineOrderModel(sequelize);
   models.OrderItem = defineOrderItemModel(sequelize);
   models.Wishlist = defineWishlistModel(sequelize);
-  models.WishlistItem = defineWishlistItemModel(sequelize); // Add WishlistItem model initialization
+  models.WishlistItem = defineWishlistItemModel(sequelize);
+  models.Supplier = defineSupplierModel(sequelize); // Added Supplier model initialization
 
   // Create junction tables for many-to-many relationships
   models.UserRole = sequelize.define('UserRole', {}, { tableName: 'UserRoles', timestamps: false });
   models.ProductCategory = sequelize.define('ProductCategory', {}, { timestamps: false });
-  // Remove the empty WishlistItem definition since we now have a proper model
-  // models.WishlistItem = sequelize.define('WishlistItem', {}, { timestamps: false });
 
   // Setup associations
   // Address associations
@@ -53,14 +52,17 @@ try {
   models.Category.belongsTo(models.Category, { foreignKey: 'parentId', as: 'parent' });
   models.Category.hasMany(models.Category, { foreignKey: 'parentId', as: 'subcategories' });
 
-  // Product associations
-  models.Product.belongsTo(models.User, { as: 'supplier', foreignKey: 'supplierId' });
+  // Product associations (updated to use Supplier instead of User)
+  models.Product.belongsTo(models.Supplier, { as: 'supplier', foreignKey: 'supplierId' });
+  models.Supplier.hasMany(models.Product, { foreignKey: 'supplierId', as: 'products' });
+  
+  // Product-Category associations
   models.Product.belongsToMany(models.Category, { through: models.ProductCategory, as: 'categories' });
   models.Category.belongsToMany(models.Product, { through: models.ProductCategory, as: 'products' });
 
   // ProductImage associations
   models.ProductImage.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
-  models.Product.hasMany(models.ProductImage, { foreignKey: 'productId', as: 'productImages' }); // Using 'productImages' to avoid collision with 'imageUrls' attribute
+  models.Product.hasMany(models.ProductImage, { foreignKey: 'productId', as: 'productImages' });
 
   // Review associations
   models.Review.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
@@ -75,6 +77,10 @@ try {
   models.OrderItem.belongsTo(models.Order, { foreignKey: 'orderId', as: 'order' });
   models.OrderItem.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
 
+  // Supplier-Order associations (new)
+  models.Order.belongsTo(models.Supplier, { foreignKey: 'supplierId', as: 'supplier' });
+  models.Supplier.hasMany(models.Order, { foreignKey: 'supplierId', as: 'orders' });
+
   // User-Role associations
   models.User.belongsToMany(models.Role, { through: models.UserRole, as: 'roles' });
   models.Role.belongsToMany(models.User, { through: models.UserRole, as: 'users' });
@@ -83,7 +89,7 @@ try {
   models.Wishlist.belongsTo(models.Customer, { foreignKey: 'customerId', as: 'customer' });
   models.Customer.hasMany(models.Wishlist, { foreignKey: 'customerId', as: 'wishlists' });
   
-  // Updated Wishlist-Product many-to-many relationship with explicit through model
+  // Wishlist-Product many-to-many relationship with explicit through model
   models.Wishlist.belongsToMany(models.Product, { 
     through: models.WishlistItem,
     foreignKey: 'wishlistId', 
@@ -98,7 +104,7 @@ try {
     as: 'wishlists' 
   });
   
-  // Add explicit associations for WishlistItem to enable easier queries
+  // WishlistItem explicit associations
   models.WishlistItem.belongsTo(models.Wishlist, { foreignKey: 'wishlistId' });
   models.Wishlist.hasMany(models.WishlistItem, { foreignKey: 'wishlistId' });
   
@@ -121,8 +127,6 @@ try {
       // Calculate average rating
       let avgRating = 0;
       if (reviews.length > 0) {
-        // Fix for: Parameter 'total' implicitly has an 'any' type
-        // Fix for: Parameter 'review' implicitly has an 'any' type
         const sum = reviews.reduce((total: number, review: { rating: number }) => total + review.rating, 0);
         avgRating = sum / reviews.length;
       }
@@ -157,8 +161,6 @@ try {
 
       // Calculate totals
       const totalItems = items.length;
-      // Fix for: Parameter 'sum' implicitly has an 'any' type
-      // Fix for: Parameter 'item' implicitly has an 'any' type
       const totalAmount = items.reduce((sum: number, item: { total: number }) => sum + Number(item.total), 0);
 
       // Update order with new totals
@@ -202,6 +204,72 @@ try {
 
   models.OrderItem.addHook('afterDestroy', async (item: OrderItem) => {
     await updateOrderTotals(item.orderId);
+  });
+
+  // Add hook to update supplier rating based on reviews
+  const updateSupplierRating = async (supplierId: number): Promise<void> => {
+    try {
+      // Get all products for this supplier
+      const products = await models.Product.findAll({
+        where: { supplierId },
+        attributes: ['id']
+      });
+      
+      const productIds = products.map((product: any) => product.id);
+      
+      if (productIds.length === 0) {
+        return;
+      }
+      
+      // Get approved reviews for all supplier's products
+      const reviews = await models.Review.findAll({
+        where: {
+          productId: { [Op.in]: productIds }, // Use imported Op directly
+          isApproved: true
+        },
+        attributes: ['rating']
+      });
+      
+      // Calculate average rating
+      let avgRating = 0;
+      if (reviews.length > 0) {
+        const sum = reviews.reduce((total: number, review: { rating: number }) => total + review.rating, 0);
+        avgRating = sum / reviews.length;
+      }
+      
+      // Update supplier rating
+      await models.Supplier.update(
+        { rating: avgRating },
+        { where: { id: supplierId } }
+      );
+    } catch (error) {
+      logger.error(`Error updating supplier rating: ${error}`);
+    }
+  };
+  
+  // Add hook for updating supplier rating when review is created/updated
+  models.Review.addHook('afterCreate', async (review: Review) => {
+    try {
+      const product = await models.Product.findByPk(review.productId);
+      if (product) {
+        await updateSupplierRating((product as any).supplierId);
+      }
+    } catch (error) {
+      logger.error(`Error triggering supplier rating update: ${error}`);
+    }
+  });
+  
+  models.Review.addHook('afterUpdate', async (review: Review) => {
+    try {
+      if (review.changed('rating') || review.changed('isApproved')) {
+        const product = await models.Product.findByPk(review.productId);
+        if (product) {
+          await updateSupplierRating((product as any).supplierId);
+        }
+      }
+    } catch (error) {
+      logger.error(`Error triggering supplier rating update: ${error}`);
+    }
   });
 
 } catch (error) {

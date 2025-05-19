@@ -20,6 +20,7 @@ import wishlistRoutes from './src/routes/wishlistRoutes';
 import orderRoutes from './src/routes/orderRoutes';
 import addressRoutes from './src/routes/addressRoutes';
 import reviewRoutes from './src/routes/reviewRoutes';
+import supplierRoutes from './src/routes/supplierRoutes'; // Import supplier routes
 
 // Middleware
 import { errorHandler } from './src/middleware/errorHandler';
@@ -56,6 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/suppliers', supplierRoutes); // Add supplier routes
 app.use('/api/wishlists', wishlistRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/addresses', addressRoutes);

@@ -3,7 +3,7 @@ import models from '../models';
 import config from '../config/env';
 import logger from '../config/logger';
 
-const { User, Role } = models;
+const { User, Role, Supplier } = models;
 
 // Define basic permissions for the system
 const permissions = [
@@ -21,6 +21,9 @@ const permissions = [
   
   // Customer management
   'customer:create', 'customer:view', 'customer:update', 'customer:delete',
+  
+  // Supplier management
+  'supplier:create', 'supplier:view', 'supplier:update', 'supplier:delete',
   
   // Report access
   'report:view',
@@ -55,16 +58,18 @@ const roles = [
       'order:view', 'order:update',
       'category:view',
       'customer:view',
+      'supplier:view',
       'report:view',
     ],
   },
   {
     name: 'supplier',
-    description: 'Supplier staff with limited permissions',
+    description: 'Supplier with their own product management',
     permissions: [
-      'product:view',
-      'order:create', 'order:view',
-      'customer:create', 'customer:view',
+      'product:create', 'product:view', 'product:update', 'product:delete',
+      'order:view',
+      'category:view',
+      'profile:view', 'profile:update',
     ],
   },
   {
@@ -87,6 +92,19 @@ const superadminUser = {
   password: 'NLrBluwgOqAn',
   firstName: 'Super',
   lastName: 'Admin',
+  isActive: true,
+};
+
+// Default supplier data
+const defaultSupplier = {
+  name: 'FastShop Marketplace',
+  email: 'marketplace@fastshopping.rw',
+  password: 'SupplierPassword123',
+  contactPerson: 'Market Admin',
+  phone: '+ 250788191800',
+  description: 'The main marketplace supplier for FastShop',
+  website: 'https://fastshopping.rw',
+  isVerified: true,
   isActive: true,
 };
 
@@ -176,6 +194,35 @@ const createSuperadminUser = async () => {
 };
 
 /**
+ * Create default supplier
+ */
+const createDefaultSupplier = async () => {
+  try {
+    logger.info('Creating default supplier...');
+    
+    // Check if default supplier already exists
+    const existingSupplier = await Supplier.findOne({ 
+      where: { email: defaultSupplier.email } 
+    });
+    
+    if (existingSupplier) {
+      logger.info('Default supplier already exists');
+      return true;
+    }
+    
+    // Create default supplier
+    const supplier = await Supplier.create(defaultSupplier);
+    
+    logger.info(`Created default supplier with ID: ${supplier.id}`);
+    
+    return true;
+  } catch (error) {
+    logger.error('Error creating default supplier:', error);
+    return false;
+  }
+};
+
+/**
  * Main seed function
  */
 export const seedAdminAndRoles = async () => {
@@ -194,7 +241,13 @@ export const seedAdminAndRoles = async () => {
       throw new Error('Failed to create superadmin user');
     }
     
-    logger.info('Admin and roles seeding completed successfully');
+    // Create default supplier
+    const supplierCreated = await createDefaultSupplier();
+    if (!supplierCreated) {
+      throw new Error('Failed to create default supplier');
+    }
+    
+    logger.info('Admin, roles and default supplier seeding completed successfully');
     return true;
   } catch (error) {
     logger.error('Admin and roles seeding failed:', error);

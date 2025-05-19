@@ -6,10 +6,10 @@ import { AppError } from "../middleware/errorHandler";
 import config from "../config/env";
 import models from "../models";
 
-const { User, Customer, Role } = models;
+const { User, Customer, Role, Supplier } = models;
 
 /**
- * Login admin
+ * Login admin/staff
  * @route POST /api/auth/login
  * @access Public
  */
@@ -64,6 +64,66 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     token,
     data: {
       user: userData,
+    },
+  });
+});
+
+/**
+ * Login supplier
+ * @route POST /api/auth/supplier/login
+ * @access Public
+ */
+export const supplierLogin = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    throw new AppError('Please provide email and password', 400);
+  }
+  
+  // Find supplier by email
+  const supplier = await Supplier.findOne({
+    where: { email }
+  });
+  
+  if (!supplier) {
+    throw new AppError('Invalid credentials', 401);
+  }
+  
+  // Check if supplier is active
+  if (!supplier.isActive) {
+    throw new AppError('Your account is inactive. Please contact support.', 401);
+  }
+  
+  // Validate password
+  const isPasswordValid = await supplier.validatePassword(password);
+  if (!isPasswordValid) {
+    throw new AppError('Invalid credentials', 401);
+  }
+  
+  // Update last login timestamp
+  supplier.lastLogin = new Date();
+  await supplier.save();
+  
+  // Generate JWT token
+  const secretKey: Secret = config.jwt.secret;
+  const signOptions: SignOptions = { 
+    expiresIn: config.jwt.expiresIn as any
+  };
+  
+  const token = jwt.sign(
+    { id: supplier.id, role: 'supplier' },
+    secretKey,
+    signOptions
+  );
+  
+  // Remove password from response
+  const supplierData = supplier.toJSON();
+  
+  res.status(200).json({
+    status: 'success',
+    token,
+    data: {
+      supplier: supplierData,
     },
   });
 });
@@ -147,6 +207,76 @@ export const registerAdmin = asyncHandler(
     });
   }
 );
+
+/**
+ * Register a new supplier
+ * @route POST /api/auth/supplier/register
+ * @access Private (Admin only, typically)
+ */
+export const registerSupplier = asyncHandler(async (req: Request, res: Response) => {
+  const {
+    name,
+    email,
+    password,
+    contactPerson,
+    phone,
+    address,
+    website,
+    description,
+    tin,
+    isVerified,
+    isActive
+  } = req.body;
+  
+  // Validate required fields
+  if (!name || !email || !password || !contactPerson) {
+    throw new AppError('Please provide name, email, password, and contact person', 400);
+  }
+  
+  // Check if email already exists
+  const existingSupplier = await Supplier.findOne({ where: { email } });
+  if (existingSupplier) {
+    throw new AppError('Email already in use', 400);
+  }
+  
+  // Create supplier
+  const supplier = await Supplier.create({
+    name,
+    email,
+    password, // Will be hashed by model hook
+    contactPerson,
+    phone,
+    address,
+    website,
+    description,
+    tin,
+    isVerified: isVerified !== undefined ? isVerified : false,
+    isActive: isActive !== undefined ? isActive : true,
+  });
+  
+  // Generate JWT token
+  const secretKey: Secret = config.jwt.secret;
+  const signOptions: SignOptions = {
+    expiresIn: config.jwt.expiresIn as any,
+  };
+  
+  const token = jwt.sign(
+    { id: supplier.id, role: 'supplier' },
+    secretKey,
+    signOptions
+  );
+  
+  // Remove password from response
+  const supplierData = supplier.toJSON();
+  
+  res.status(201).json({
+    status: 'success',
+    token,
+    data: {
+      supplier: supplierData,
+    },
+  });
+});
 
 /**
  * Register a new customer
@@ -247,9 +377,22 @@ export const updateAuthPassword = asyncHandler(
       );
     }
 
-    // Find user (could be admin or customer)
-    const Model = req.user!.role === "admin" ? User : Customer;
-    const user = await Model.findByPk(req.user!.id);
+    // Find user based on role
+    let user;
+    switch(req.user!.role) {
+      case "admin":
+      case "superadmin":
+        user = await User.findByPk(req.user!.id);
+        break;
+      case "supplier":
+        user = await Supplier.findByPk(req.user!.id);
+        break;
+      case "customer":
+        user = await Customer.findByPk(req.user!.id);
+        break;
+      default:
+        throw new AppError("Invalid user role", 400);
+    }
 
     if (!user) {
       throw new AppError("User not found", 404);
@@ -286,7 +429,20 @@ export const forgotPassword = asyncHandler(
     }
 
     // Determine model based on user type
-    const Model = userType === "admin" ? User : Customer;
+    let Model;
+    switch(userType) {
+      case "admin":
+        Model = User;
+        break;
+      case "supplier":
+        Model = Supplier;
+        break;
+      case "customer":
+        Model = Customer;
+        break;
+      default:
+        throw new AppError("Invalid user type", 400);
+    }
 
     // Find user by email
     const user = await Model.findOne({ where: { email } });
@@ -308,7 +464,7 @@ export const forgotPassword = asyncHandler(
     };
 
     const resetToken = jwt.sign(
-      { id: user.id, purpose: "reset_password" },
+      { id: user.id, purpose: "reset_password", role: userType },
       secretKey,
       signOptions
     );
@@ -411,14 +567,28 @@ export const resetPassword = asyncHandler(
       const decoded = jwt.verify(token, secretKey) as {
         id: number;
         purpose: string;
+        role: string;
       };
 
       if (decoded.purpose !== "reset_password") {
         throw new AppError("Invalid token", 400);
       }
 
-      // Determine model based on user type
-      const Model = userType === "admin" ? User : Customer;
+      // Determine model based on role from token
+      let Model;
+      switch(decoded.role) {
+        case "admin":
+          Model = User;
+          break;
+        case "supplier":
+          Model = Supplier;
+          break;
+        case "customer":
+          Model = Customer;
+          break;
+        default:
+          throw new AppError("Invalid user type in token", 400);
+      }
 
       // Find user by ID
       const user = await Model.findByPk(decoded.id);
@@ -440,3 +610,16 @@ export const resetPassword = asyncHandler(
     }
   }
 );
+
+export default {
+  login,
+  supplierLogin,
+  registerAdmin,
+  registerSupplier,
+  registerCustomer,
+  getCurrentUser,
+  updateAuthPassword,
+  forgotPassword,
+  customerLogin,
+  resetPassword
+};

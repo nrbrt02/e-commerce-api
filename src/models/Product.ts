@@ -1,4 +1,3 @@
-// src/models/Product.ts
 import { Model, DataTypes, Optional, Sequelize } from 'sequelize';
 
 // Define the interface for Product attributes
@@ -50,7 +49,7 @@ export class Product extends Model<ProductAttributes, ProductCreationAttributes>
   public dimensions!: object | null;
   public metadata!: object | null;
   public tags!: string[] | null;
-  public imageUrls!: string[] | null; // Renamed from 'images' to 'imageUrls'
+  public imageUrls!: string[] | null;
   public supplierId!: number;
   
   public readonly createdAt!: Date;
@@ -142,7 +141,7 @@ export default function defineProductModel(sequelize: Sequelize): typeof Product
         type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true,
       },
-      imageUrls: { // Renamed from 'images' to 'imageUrls'
+      imageUrls: {
         type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true,
       },
@@ -150,7 +149,7 @@ export default function defineProductModel(sequelize: Sequelize): typeof Product
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-          model: 'users',
+          model: 'suppliers',
           key: 'id',
         },
       },
