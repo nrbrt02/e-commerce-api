@@ -1361,3 +1361,174 @@ export const convertDraftToOrder = asyncHandler(
     }
   }
 );
+
+/**
+ * Get supplier orders (orders containing their products)
+ * @route GET /api/orders/supplier-orders
+ * @access Private (Supplier)
+ */
+export const getSupplierOrders = asyncHandler(async (req: Request, res: Response) => {
+  // Get supplier ID from authenticated user
+  const supplierId = req.user!.id;
+
+  // First find all order items that belong to this supplier's products
+  const orderItems = await OrderItem.findAll({
+    include: [{
+      model: Product,
+      as: 'product',
+      where: { supplierId },
+      attributes: [] // We don't need product details
+    }],
+    attributes: ['orderId'], // We only need the order IDs
+    group: ['orderId'], // Group by order to avoid duplicates
+    raw: true
+  });
+
+  // Define type for the order items
+  interface OrderItemResult {
+    orderId: number;
+  }
+
+  // Extract the unique order IDs with proper typing
+  const orderIds: number[] = orderItems.map((item: OrderItemResult) => item.orderId);
+
+  // If no orders found, return empty array
+  if (orderIds.length === 0) {
+    return res.status(200).json({
+      status: "success",
+      results: 0,
+      pagination: {
+        totalOrders: 0,
+        totalPages: 0,
+        currentPage: 1,
+        limit: 20,
+        hasPrevPage: false,
+        hasNextPage: false,
+      },
+      data: {
+        orders: [],
+      },
+    });
+  }
+
+  // Build query for the orders with proper typing
+  const queryBuilder: {
+    where: {
+      id: {
+        [Op.in]: number[];
+      };
+      status?: OrderStatus;
+      paymentStatus?: PaymentStatus;
+      createdAt?: {
+        [Op.gte]?: Date;
+        [Op.lte]?: Date;
+      };
+    };
+    include: any[];
+    limit?: number;
+    offset?: number;
+    order?: any[];
+  } = {
+    where: {
+      id: { [Op.in]: orderIds }
+    },
+    include: [
+      {
+        model: OrderItem,
+        as: "items",
+        include: [{
+          model: Product,
+          as: "product",
+          where: { supplierId },
+          attributes: []
+        }]
+      },
+      {
+        model: Customer,
+        as: "customer",
+        attributes: ["id", "username", "email", "firstName", "lastName", "phone"]
+      }
+    ]
+  };
+
+  // Filter by status with type checking
+  if (req.query.status) {
+    const status = req.query.status as string;
+    if (Object.values(OrderStatus).includes(status as OrderStatus)) {
+      queryBuilder.where.status = status as OrderStatus;
+    } else {
+      throw new AppError("Invalid order status", 400);
+    }
+  }
+
+  // Filter by payment status with type checking
+  if (req.query.paymentStatus) {
+    const paymentStatus = req.query.paymentStatus as string;
+    if (Object.values(PaymentStatus).includes(paymentStatus as PaymentStatus)) {
+      queryBuilder.where.paymentStatus = paymentStatus as PaymentStatus;
+    } else {
+      throw new AppError("Invalid payment status", 400);
+    }
+  }
+
+  // Filter by date range with validation
+  if (req.query.startDate) {
+    const startDate = new Date(req.query.startDate as string);
+    if (!isNaN(startDate.getTime())) {
+      queryBuilder.where.createdAt = {
+        ...queryBuilder.where.createdAt,
+        [Op.gte]: startDate,
+      };
+    } else {
+      throw new AppError("Invalid start date format", 400);
+    }
+  }
+
+  if (req.query.endDate) {
+    const endDate = new Date(req.query.endDate as string);
+    if (!isNaN(endDate.getTime())) {
+      endDate.setHours(23, 59, 59, 999);
+      queryBuilder.where.createdAt = {
+        ...queryBuilder.where.createdAt,
+        [Op.lte]: endDate,
+      };
+    } else {
+      throw new AppError("Invalid end date format", 400);
+    }
+  }
+
+  // Pagination with validation
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = (page - 1) * limit;
+
+  queryBuilder.limit = limit;
+  queryBuilder.offset = offset;
+
+  // Sorting with validation
+  const sortField = req.query.sortBy as string || "createdAt";
+  const sortOrder = req.query.sortOrder === "asc" ? "ASC" : "DESC";
+  queryBuilder.order = [[sortField, sortOrder]];
+
+  // Execute query with proper error handling
+  const { count, rows: orders } = await Order.findAndCountAll(queryBuilder);
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(count / limit);
+
+  res.status(200).json({
+    status: "success",
+    results: orders.length,
+    pagination: {
+      totalOrders: count,
+      totalPages,
+      currentPage: page,
+      limit,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    },
+    data: {
+      orders,
+    },
+  });
+});

@@ -115,7 +115,7 @@ export const getSupplierById = asyncHandler(async (req: Request, res: Response) 
 /**
  * Get supplier products
  * @route GET /api/suppliers/:id/products
- * @access Public
+ * @access Public (with private access for supplier)
  */
 export const getSupplierProducts = asyncHandler(async (req: Request, res: Response) => {
   const supplierId = parseInt(req.params.id);
@@ -131,7 +131,6 @@ export const getSupplierProducts = asyncHandler(async (req: Request, res: Respon
   const queryBuilder: any = {
     where: {
       supplierId,
-      isPublished: true,
     },
     include: [
       {
@@ -142,15 +141,17 @@ export const getSupplierProducts = asyncHandler(async (req: Request, res: Respon
     ],
   };
   
-  // Allow admins and the supplier itself to see unpublished products
-  if (req.user) {
-    if (req.user.role === 'admin' || (req.user.role === 'supplier' && req.user.id === supplierId)) {
-      delete queryBuilder.where.isPublished;
-      
-      if (req.query.published) {
-        queryBuilder.where.isPublished = req.query.published === 'true';
-      }
-    }
+  // Check if the request is from the supplier themselves
+  const isSupplierRequest = req.user?.role === 'supplier' && req.user.id === supplierId;
+  
+  // If not a supplier request, only show published products
+  if (!isSupplierRequest) {
+    queryBuilder.where.isPublished = true;
+  }
+  
+  // If it's a supplier request and they want to filter by published status
+  if (isSupplierRequest && req.query.published) {
+    queryBuilder.where.isPublished = req.query.published === 'true';
   }
   
   // Filter by category

@@ -18,7 +18,7 @@ const router = express.Router();
 // Public routes
 router.post('/register', registerAdmin);
 router.post('/customer/register', registerCustomer);
-router.post('/supplier/register', restrictTo('admin'), registerSupplier); // Admin only
+router.post('/supplier/register', restrictTo('admin'), registerSupplier);
 router.post('/login', login);
 router.post('/customer/login', customerLogin);
 router.post('/supplier/login', supplierLogin);

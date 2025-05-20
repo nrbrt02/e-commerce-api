@@ -5,7 +5,7 @@ import { AppError } from './errorHandler';
 import models from '../models';
 import config from '../config/env';
 
-const { User, Customer } = models;
+const { User, Customer, Supplier } = models;
 
 // Extend Request interface to include user
 declare global {
@@ -47,19 +47,15 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   return protect(req, res, next);
 };
 
-/**
- * Protect routes - Check if user is authenticated
- */
 export const protect = async (req: Request, res: Response, next: NextFunction) => {
   try {
     let token: string | undefined;
 
-    // Check if token exists in headers
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    // Get token from headers
+    if (req.headers.authorization?.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
 
-    // Check if token exists
     if (!token) {
       return next(new AppError('You are not logged in. Please log in to get access.', 401));
     }
@@ -68,22 +64,32 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     const secretKey: Secret = config.jwt.secret;
     const decoded = jwt.verify(token, secretKey) as JwtPayload;
 
-    // Check if user still exists
-    const Model = decoded.role === 'admin' || decoded.role === 'superadmin' ? User : Customer;
+    // Determine which model to use based on role
+    let Model;
+    switch(decoded.role) {
+      case 'admin':
+      case 'superadmin':
+        Model = User;
+        break;
+      case 'supplier':
+        Model = Supplier;
+        break;
+      default:
+        Model = Customer;
+    }
+
     const currentUser = await Model.findByPk(decoded.id);
 
     if (!currentUser) {
       return next(new AppError('The user belonging to this token no longer exists.', 401));
     }
 
-    // Check if user is active
     if (!currentUser.isActive) {
       return next(new AppError('Your account has been deactivated. Please contact support.', 401));
     }
 
     // Attach user to request
     req.user = currentUser;
-    // Also attach the role from the token to make it easily accessible
     req.user.role = decoded.role;
 
     next();

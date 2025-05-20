@@ -13,7 +13,8 @@ import {
   getMyDraftOrders,
   getMyDraftOrderById,
   convertDraftToOrder,
-  deleteOrderDraft
+  deleteOrderDraft,
+  getSupplierOrders
 } from '../controllers';
 import { protect, restrictTo } from '../middleware/auth';
 
@@ -35,9 +36,11 @@ router.put('/draft/:id', restrictTo('customer'), updateOrderDraft);
 router.post('/draft/:id/convert', restrictTo('customer'), convertDraftToOrder);
 router.delete('/draft/:id', restrictTo('customer'), deleteOrderDraft);
 
+router.get('/supplier-orders', restrictTo('supplier'), getSupplierOrders);
+
 // Admin routes
 router.get('/', restrictTo('admin'), getOrders);
-router.get('/:id', getOrderById); // Both admin and customer (if their own order)
+router.get('/:id', getOrderById);
 router.patch('/:id/status', restrictTo('admin'), updateOrderStatus);
 router.patch('/:id/payment', restrictTo('admin'), updatePaymentStatus);
 

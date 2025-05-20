@@ -20,7 +20,7 @@ interface ProductAttributes {
   dimensions: object | null;
   metadata: object | null;
   tags: string[] | null;
-  imageUrls: string[] | null; // Renamed from 'images' to 'imageUrls' to avoid naming collision
+  imageUrls: string[] | null;
   supplierId: number;
   createdAt?: Date;
   updatedAt?: Date;

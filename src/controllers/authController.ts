@@ -211,7 +211,7 @@ export const registerAdmin = asyncHandler(
 /**
  * Register a new supplier
  * @route POST /api/auth/supplier/register
- * @access Private (Admin only, typically)
+ * @access Private (Admin only)
  */
 export const registerSupplier = asyncHandler(async (req: Request, res: Response) => {
   const {
@@ -254,24 +254,11 @@ export const registerSupplier = asyncHandler(async (req: Request, res: Response)
     isActive: isActive !== undefined ? isActive : true,
   });
   
-  // Generate JWT token
-  const secretKey: Secret = config.jwt.secret;
-  const signOptions: SignOptions = {
-    expiresIn: config.jwt.expiresIn as any,
-  };
-  
-  const token = jwt.sign(
-    { id: supplier.id, role: 'supplier' },
-    secretKey,
-    signOptions
-  );
-  
   // Remove password from response
   const supplierData = supplier.toJSON();
   
   res.status(201).json({
     status: 'success',
-    token,
     data: {
       supplier: supplierData,
     },

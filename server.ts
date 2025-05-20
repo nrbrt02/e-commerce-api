@@ -57,7 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);
-app.use('/api/suppliers', supplierRoutes); // Add supplier routes
+app.use('/api/suppliers', supplierRoutes);
 app.use('/api/wishlists', wishlistRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/addresses', addressRoutes);
