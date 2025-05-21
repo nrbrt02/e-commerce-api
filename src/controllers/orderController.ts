@@ -250,14 +250,17 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
 
     for (const item of items) {
       // Validate item
-      if (!item.productId || !item.quantity) {
+      if ((!item.productId && !item.id) || !item.quantity) {
         throw new AppError("Invalid order item", 400);
       }
 
-      const product = await Product.findByPk(item.productId, { transaction });
+      // Use productId if available, otherwise use id
+      const productId = item.productId || item.id;
+
+      const product = await Product.findByPk(productId, { transaction });
 
       if (!product) {
-        throw new AppError(`Product with ID ${item.productId} not found`, 404);
+        throw new AppError(`Product with ID ${productId} not found`, 404);
       }
 
       if (!product.isPublished) {
@@ -707,18 +710,21 @@ export const saveOrderDraft = asyncHandler(
 
         for (const item of items) {
           // Validate item
-          if (!item.productId || !item.quantity) {
+          if ((!item.productId && !item.id) || !item.quantity) {
             throw new AppError("Invalid order item", 400);
           }
 
+          // Use productId if available, otherwise use id
+          const productId = item.productId || item.id;
+
           // Get product
-          const product = await Product.findByPk(item.productId, {
+          const product = await Product.findByPk(productId, {
             transaction,
           });
 
           if (!product) {
             throw new AppError(
-              `Product with ID ${item.productId} not found`,
+              `Product with ID ${productId} not found`,
               404
             );
           }
@@ -913,18 +919,21 @@ export const updateOrderDraft = asyncHandler(
         if (items.length > 0) {
           for (const item of items) {
             // Validate item
-            if (!item.productId || !item.quantity) {
+            if ((!item.productId && !item.id) || !item.quantity) {
               throw new AppError("Invalid order item", 400);
             }
 
+            // Use productId if available, otherwise use id
+            const productId = item.productId || item.id;
+
             // Get product
-            const product = await Product.findByPk(item.productId, {
+            const product = await Product.findByPk(productId, {
               transaction,
             });
 
             if (!product) {
               throw new AppError(
-                `Product with ID ${item.productId} not found`,
+                `Product with ID ${productId} not found`,
                 404
               );
             }
@@ -987,6 +996,10 @@ export const updateOrderDraft = asyncHandler(
             paymentMethod !== undefined
               ? paymentMethod
               : draftOrder.paymentMethod,
+          paymentDetails:
+            req.body.paymentDetails !== undefined
+              ? req.body.paymentDetails
+              : draftOrder.paymentDetails,
           shippingMethod:
             shippingMethod !== undefined
               ? shippingMethod
