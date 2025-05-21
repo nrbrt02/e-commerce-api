@@ -889,6 +889,9 @@ export const updateOrderDraft = asyncHandler(
         paymentMethod,
         shippingMethod,
         notes,
+        total,
+        shipping,
+        lastUpdated
       } = req.body;
 
       // Validate items (can be empty for draft)
@@ -983,14 +986,13 @@ export const updateOrderDraft = asyncHandler(
         }
       }
 
-      // Calculate total amount
-      const totalAmount =
-        subtotal + taxAmount + shippingAmount - discountAmount;
+      // Calculate total amount - use provided total if available, otherwise calculate
+      const totalAmount = total !== undefined ? total : (subtotal + taxAmount + shippingAmount - discountAmount);
 
       // Update draft order
       await draftOrder.update(
         {
-          totalAmount: items ? totalAmount : draftOrder.totalAmount,
+          totalAmount: totalAmount,
           totalItems: items ? totalItems : draftOrder.totalItems,
           paymentMethod:
             paymentMethod !== undefined
@@ -1016,7 +1018,9 @@ export const updateOrderDraft = asyncHandler(
           metadata: {
             ...(draftOrder.metadata || {}),
             isDraft: true,
-            draftLastUpdatedAt: new Date().toISOString(),
+            draftLastUpdatedAt: lastUpdated || new Date().toISOString(),
+            totalAmount: totalAmount,
+            shipping: shipping || shippingAmount
           },
         },
         { transaction }
