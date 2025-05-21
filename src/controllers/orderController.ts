@@ -887,12 +887,19 @@ export const updateOrderDraft = asyncHandler(
         shippingAddress,
         billingAddress,
         paymentMethod,
+        paymentStatus,
+        paymentDetails,
         shippingMethod,
         notes,
         total,
         shipping,
         lastUpdated
       } = req.body;
+
+      // Validate payment status if provided
+      if (paymentStatus && !Object.values(PaymentStatus).includes(paymentStatus as PaymentStatus)) {
+        throw new AppError("Invalid payment status", 400);
+      }
 
       // Validate items (can be empty for draft)
       if (items && !Array.isArray(items)) {
@@ -998,9 +1005,13 @@ export const updateOrderDraft = asyncHandler(
             paymentMethod !== undefined
               ? paymentMethod
               : draftOrder.paymentMethod,
+          paymentStatus:
+            paymentStatus !== undefined
+              ? paymentStatus
+              : draftOrder.paymentStatus,
           paymentDetails:
-            req.body.paymentDetails !== undefined
-              ? req.body.paymentDetails
+            paymentDetails !== undefined
+              ? paymentDetails
               : draftOrder.paymentDetails,
           shippingMethod:
             shippingMethod !== undefined
@@ -1020,7 +1031,9 @@ export const updateOrderDraft = asyncHandler(
             isDraft: true,
             draftLastUpdatedAt: lastUpdated || new Date().toISOString(),
             totalAmount: totalAmount,
-            shipping: shipping || shippingAmount
+            shipping: shipping || shippingAmount,
+            paymentStatus: paymentStatus || draftOrder.paymentStatus,
+            paymentDetails: paymentDetails || draftOrder.paymentDetails
           },
         },
         { transaction }
