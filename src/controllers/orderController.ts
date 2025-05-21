@@ -1352,6 +1352,9 @@ export const convertDraftToOrder = asyncHandler(
         convertedFromDraft: true,
         draftOrderNumber: draftOrder.orderNumber,
         convertedAt: new Date().toISOString(),
+        totalAmount: draftOrder.totalAmount,
+        paymentStatus: draftOrder.paymentStatus,
+        paymentDetails: draftOrder.paymentDetails
       };
 
       // Convert draft to regular order
@@ -1359,7 +1362,8 @@ export const convertDraftToOrder = asyncHandler(
         {
           orderNumber: generateOrderNumber(),
           status: OrderStatus.PENDING,
-          paymentStatus: PaymentStatus.PENDING,
+          paymentStatus: draftOrder.paymentStatus || PaymentStatus.PENDING,
+          totalAmount: draftOrder.totalAmount,
           metadata,
         },
         { transaction }
