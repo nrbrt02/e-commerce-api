@@ -896,26 +896,15 @@ export const updateOrderDraft = asyncHandler(
         lastUpdated
       } = req.body;
 
-      // Validate payment status if provided
-      if (paymentStatus && !Object.values(PaymentStatus).includes(paymentStatus as PaymentStatus)) {
-        throw new AppError("Invalid payment status", 400);
-      }
+      // Initialize update data object
+      const updateData: any = {};
 
-      // Validate items (can be empty for draft)
-      if (items && !Array.isArray(items)) {
-        throw new AppError("Items must be an array", 400);
-      }
-
-      // Initialize order totals
-      let subtotal = 0;
-      let taxAmount = 0;
-      let shippingAmount = 0;
-      let discountAmount = 0;
-      let totalItems = 0;
-
-      // If items are provided, remove existing items and add new ones
-      if (items) {
-        totalItems = items.length;
+      // Only update fields that were provided in the request
+      if (items !== undefined) {
+        // Validate items
+        if (!Array.isArray(items)) {
+          throw new AppError("Items must be an array", 400);
+        }
 
         // Remove existing items
         await OrderItem.destroy({
@@ -923,42 +912,30 @@ export const updateOrderDraft = asyncHandler(
           transaction,
         });
 
-        // Process new items
-        const orderItems = [];
-
+        // Process new items if any
         if (items.length > 0) {
+          let subtotal = 0;
+          let taxAmount = 0;
+          let totalItems = items.length;
+
           for (const item of items) {
-            // Validate item
             if ((!item.productId && !item.id) || !item.quantity) {
               throw new AppError("Invalid order item", 400);
             }
 
-            // Use productId if available, otherwise use id
             const productId = item.productId || item.id;
-
-            // Get product
-            const product = await Product.findByPk(productId, {
-              transaction,
-            });
+            const product = await Product.findByPk(productId, { transaction });
 
             if (!product) {
-              throw new AppError(
-                `Product with ID ${productId} not found`,
-                404
-              );
+              throw new AppError(`Product with ID ${productId} not found`, 404);
             }
 
-            // Calculate item totals
-            const itemSubtotal =
-              parseFloat(product.price.toString()) * item.quantity;
+            const itemSubtotal = parseFloat(product.price.toString()) * item.quantity;
             subtotal += itemSubtotal;
-
-            // Apply tax if applicable (assuming 10% tax)
             const itemTax = itemSubtotal * 0.1;
             taxAmount += itemTax;
 
-            // Create order item
-            orderItems.push({
+            await OrderItem.create({
               productId: product.id,
               sku: product.sku,
               name: product.name,
@@ -968,76 +945,52 @@ export const updateOrderDraft = asyncHandler(
               discount: 0,
               tax: itemTax,
               total: itemSubtotal + itemTax,
-            });
+              orderId: draftOrder.id
+            }, { transaction });
           }
-        }
 
-        // Apply shipping amount based on shipping method
-        if (shippingMethod === "express") {
-          shippingAmount = 15;
-        } else if (shippingMethod) {
-          shippingAmount = 5;
-        }
-
-        // Create order items if any
-        if (orderItems.length > 0) {
-          for (const item of orderItems) {
-            await OrderItem.create(
-              {
-                ...item,
-                orderId: draftOrder.id,
-              },
-              { transaction }
-            );
-          }
+          updateData.totalItems = totalItems;
+          updateData.totalAmount = subtotal + taxAmount;
         }
       }
 
-      // Calculate total amount - use provided total if available, otherwise calculate
-      const totalAmount = total !== undefined ? total : (subtotal + taxAmount + shippingAmount - discountAmount);
+      // Only update these fields if they were provided
+      if (shippingAddress !== undefined) updateData.shippingAddress = shippingAddress;
+      if (billingAddress !== undefined) updateData.billingAddress = billingAddress;
+      if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+      if (paymentStatus !== undefined) {
+        if (!Object.values(PaymentStatus).includes(paymentStatus as PaymentStatus)) {
+          throw new AppError("Invalid payment status", 400);
+        }
+        updateData.paymentStatus = paymentStatus;
+      }
+      if (paymentDetails !== undefined) updateData.paymentDetails = paymentDetails;
+      if (shippingMethod !== undefined) updateData.shippingMethod = shippingMethod;
+      if (notes !== undefined) updateData.notes = notes;
 
-      // Update draft order
-      await draftOrder.update(
-        {
-          totalAmount: totalAmount,
-          totalItems: items ? totalItems : draftOrder.totalItems,
-          paymentMethod:
-            paymentMethod !== undefined
-              ? paymentMethod
-              : draftOrder.paymentMethod,
-          paymentStatus:
-            paymentStatus !== undefined
-              ? paymentStatus
-              : draftOrder.paymentStatus,
-          paymentDetails:
-            paymentDetails !== undefined
-              ? paymentDetails
-              : draftOrder.paymentDetails,
-          shippingMethod:
-            shippingMethod !== undefined
-              ? shippingMethod
-              : draftOrder.shippingMethod,
-          shippingAddress:
-            shippingAddress !== undefined
-              ? shippingAddress
-              : draftOrder.shippingAddress,
-          billingAddress:
-            billingAddress !== undefined
-              ? billingAddress
-              : draftOrder.billingAddress,
-          notes: notes !== undefined ? notes : draftOrder.notes,
-          metadata: {
-            ...(draftOrder.metadata || {}),
-            isDraft: true,
-            draftLastUpdatedAt: lastUpdated || new Date().toISOString(),
-            totalAmount: totalAmount,
-            shipping: shipping || shippingAmount,
-            paymentStatus: paymentStatus || draftOrder.paymentStatus,
-            paymentDetails: paymentDetails || draftOrder.paymentDetails
-          },
-        },
-        { transaction }
-      );
+      // Update metadata only if there are changes
+      const metadataUpdates: any = {
+        isDraft: true,
+        draftLastUpdatedAt: lastUpdated || new Date().toISOString()
+      };
+
+      if (total !== undefined) metadataUpdates.totalAmount = total;
+      if (shipping !== undefined) metadataUpdates.shipping = shipping;
+      if (paymentStatus !== undefined) metadataUpdates.paymentStatus = paymentStatus;
+      if (paymentDetails !== undefined) metadataUpdates.paymentDetails = paymentDetails;
+
+      // Only update metadata if there are changes
+      if (Object.keys(metadataUpdates).length > 0) {
+        updateData.metadata = {
+          ...(draftOrder.metadata || {}),
+          ...metadataUpdates
+        };
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updateData).length > 0) {
+        await draftOrder.update(updateData, { transaction });
+      }
 
       // Commit transaction
       await transaction.commit();
@@ -1273,6 +1226,15 @@ export const convertDraftToOrder = asyncHandler(
         throw new AppError("Draft order not found", 404);
       }
 
+      // Log initial draft order state
+      console.log('Initial draft order state:', {
+        id: draftOrder.id,
+        totalAmount: draftOrder.totalAmount,
+        metadata: draftOrder.metadata,
+        status: draftOrder.status,
+        paymentStatus: draftOrder.paymentStatus
+      });
+
       // Ensure it's a draft
       if (draftOrder.status !== OrderStatus.DRAFT) {
         throw new AppError("This order is not a draft", 400);
@@ -1345,7 +1307,7 @@ export const convertDraftToOrder = asyncHandler(
         )}${randomNum}`;
       };
 
-      // Update metadata
+      // Prepare metadata with all necessary information
       const metadata = {
         ...(draftOrder.metadata || {}),
         isDraft: false,
@@ -1354,20 +1316,33 @@ export const convertDraftToOrder = asyncHandler(
         convertedAt: new Date().toISOString(),
         totalAmount: draftOrder.totalAmount,
         paymentStatus: draftOrder.paymentStatus,
-        paymentDetails: draftOrder.paymentDetails
+        paymentDetails: draftOrder.paymentDetails,
       };
 
+      // Log metadata before update
+      console.log('Prepared metadata:', metadata);
+
+      // Prepare update data
+      const updateData = {
+        orderNumber: generateOrderNumber(),
+        status: OrderStatus.PENDING,
+        paymentStatus: draftOrder.paymentStatus || PaymentStatus.PENDING,
+        metadata,
+      };
+
+      // Log update data
+      console.log('Update data before conversion:', updateData);
+
       // Convert draft to regular order
-      await draftOrder.update(
-        {
-          orderNumber: generateOrderNumber(),
-          status: OrderStatus.PENDING,
-          paymentStatus: draftOrder.paymentStatus || PaymentStatus.PENDING,
-          totalAmount: draftOrder.totalAmount,
-          metadata,
-        },
-        { transaction }
-      );
+      await draftOrder.update(updateData, { transaction });
+
+      // Log draft order after update
+      console.log('Draft order after update:', {
+        id: draftOrder.id,
+        metadata: draftOrder.metadata,
+        status: draftOrder.status,
+        paymentStatus: draftOrder.paymentStatus
+      });
 
       // Commit transaction
       await transaction.commit();
@@ -1382,6 +1357,14 @@ export const convertDraftToOrder = asyncHandler(
         ],
       });
 
+      // Log final converted order
+      console.log('Final converted order:', {
+        id: convertedOrder.id,
+        metadata: convertedOrder.metadata,
+        status: convertedOrder.status,
+        paymentStatus: convertedOrder.paymentStatus
+      });
+
       res.status(200).json({
         status: "success",
         data: {
@@ -1389,6 +1372,9 @@ export const convertDraftToOrder = asyncHandler(
         },
       });
     } catch (error) {
+      // Log any errors
+      console.error('Error converting draft to order:', error);
+      
       // Rollback transaction on error
       await transaction.rollback();
       throw error;
