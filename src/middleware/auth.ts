@@ -152,39 +152,21 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
 /**
  * Restrict routes to specific roles
  */
-export const restrictTo = (...roles: string[]) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    // Superadmin has access to everything
+export const restrictTo = (...allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError('You are not logged in', 401));
+    }
+
+    // Allow superadmin to access everything
     if (req.user.role === 'superadmin') {
       return next();
     }
-    
-    // Check if the user has the appropriate role
-    if (req.user.role === 'admin') {
-      // For admin users (staff), check if they have any of the required roles through role-based permissions
-      // Only if roles array specifies particular admin roles (e.g., 'manager')
-      if (roles.length > 0 && !roles.includes('admin')) {
-        // This is a restricted admin route that requires specific admin roles
-        const hasRole = await req.user.hasAnyRole(roles);
-        
-        if (!hasRole) {
-          return next(new AppError('You do not have permission to perform this action', 403));
-        }
-      }
-      // If no specific admin roles needed or 'admin' is explicitly allowed, permit access
-      return next();
-    } else if (req.user.role === 'customer') {
-      // For customers, only allow if 'customer' is in the allowed roles
-      if (!roles.includes('customer')) {
-        return next(new AppError('You do not have permission to perform this action', 403));
-      }
-      return next();
-    } else {
-      // For any other role types that might be added in the future
-      if (!roles.includes(req.user.role)) {
-        return next(new AppError('You do not have permission to perform this action', 403));
-      }
-      return next();
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return next(new AppError('You do not have permission to perform this action', 403));
     }
+
+    next();
   };
 };

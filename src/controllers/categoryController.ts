@@ -130,7 +130,7 @@ export const getCategoryProducts = asyncHandler(async (req: Request, res: Respon
   };
   
   // Filter by published status for non-admin users
-  if (!req.user || !(await req.user.hasRole('admin'))) {
+  if (!req.user || req.user.role !== 'admin') {
     queryBuilder.where = {
       isPublished: true,
     };

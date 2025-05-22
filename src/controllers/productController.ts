@@ -49,8 +49,8 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   }
   
   // Filter by search term
-  if (req.query.search) {
-    const searchTerm = `%${req.query.search}%`;
+  if (req.query.search || req.query.query) {
+    const searchTerm = `%${req.query.search || req.query.query}%`;
     queryBuilder.where[Op.or] = [
       { name: { [Op.iLike]: searchTerm } },
       { description: { [Op.iLike]: searchTerm } },
@@ -311,9 +311,10 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
   
   // Check if user has permission to update
   const isAdmin = req.user!.role === 'admin';
+  const isSuperadmin = req.user!.role === 'superadmin';
   const isSupplier = req.user!.role === 'supplier' && product.supplierId === req.user!.id;
   
-  if (!isAdmin && !isSupplier) {
+  if (!isAdmin && !isSuperadmin && !isSupplier) {
     throw new AppError('You do not have permission to update this product', 403);
   }
   
@@ -487,11 +488,42 @@ export const getProductsBySupplier = asyncHandler(async (req: Request, res: Resp
   });
 });
 
+/**
+ * Get all products including drafts (admin only)
+ * @route GET /api/products/admin/all
+ * @access Private (Admin)
+ */
+export const getAllProductsIncludingDrafts = asyncHandler(async (req: Request, res: Response) => {
+  const products = await Product.findAll({
+    include: [
+      {
+        model: Category,
+        as: 'categories',
+        through: { attributes: [] },
+      },
+      {
+        model: Supplier,
+        as: 'supplier',
+        attributes: ['id', 'name', 'email', 'contactPerson'],
+      },
+    ],
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: products.length,
+    data: {
+      products,
+    },
+  });
+});
+
 export default {
   getProducts,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
-  getProductsBySupplier
+  getProductsBySupplier,
+  getAllProductsIncludingDrafts
 };

@@ -49,7 +49,7 @@ export const getProductReviews = asyncHandler(
     }
 
     // Include admin-only filters if user is admin
-    if (req.user && (await req.user.hasRole("admin"))) {
+    if (req.user && req.user.role === "admin") {
       // Remove the isApproved filter for admins
       delete queryBuilder.where.isApproved;
 
@@ -119,7 +119,7 @@ export const getReviewById = asyncHandler(
         throw new AppError("Review not found", 404);
       }
 
-      const isAdmin = await req.user.hasRole("admin");
+      const isAdmin = req.user.role === "admin";
       const isOwner = "id" in req.user && review.customerId === req.user.id;
 
       if (!isAdmin && !isOwner) {
@@ -271,7 +271,7 @@ export const updateReview = asyncHandler(
     }
 
     // Check if user is the owner or admin
-    const isAdmin = req.user && (await req.user.hasRole("admin"));
+    const isAdmin = req.user && req.user.role === "admin";
     const isOwner = req.user && review.customerId === req.user.id;
 
     if (!isAdmin && !isOwner) {
@@ -333,7 +333,7 @@ export const deleteReview = asyncHandler(
     }
 
     // Check if user is the owner or admin
-    const isAdmin = req.user && (await req.user.hasRole("admin"));
+    const isAdmin = req.user && req.user.role === "admin";
     const isOwner = req.user && review.customerId === req.user.id;
 
     if (!isAdmin && !isOwner) {
@@ -612,7 +612,7 @@ export const getProductReviewStats = asyncHandler(async (req: Request, res: Resp
   };
   
   // Include all reviews for admins
-  if (req.user && await req.user.hasRole("admin")) {
+  if (req.user && req.user.role === "admin") {
     delete whereClause.isApproved;
   }
   
@@ -689,5 +689,108 @@ export const getProductReviewStats = asyncHandler(async (req: Request, res: Resp
       recommendationPercentage,
       lastReviewDate: latestReview ? latestReview.createdAt : null,
     }
+  });
+});
+
+/**
+ * Get reviews for supplier's products
+ * @route GET /api/reviews/supplier
+ * @access Private (Supplier)
+ */
+export const getSupplierProductReviews = asyncHandler(async (req: Request, res: Response) => {
+  // Get supplier ID from authenticated user
+  const supplierId = req.user!.id;
+
+  // Build query
+  const queryBuilder: any = {
+    include: [
+      {
+        model: Product,
+        as: "product",
+        where: { supplierId },
+        attributes: ["id", "name", "sku", "imageUrls", "mainImage", "images"],
+      },
+      {
+        model: Customer,
+        as: "customer",
+        attributes: ["id", "username", "firstName", "lastName", "avatar"],
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+  };
+
+  // Filter by rating
+  if (req.query.rating) {
+    queryBuilder.where = {
+      ...queryBuilder.where,
+      rating: parseInt(req.query.rating as string),
+    };
+  }
+
+  // Filter by verified purchases
+  if (req.query.verified === "true") {
+    queryBuilder.where = {
+      ...queryBuilder.where,
+      isVerifiedPurchase: true,
+    };
+  }
+
+  // Filter by approval status
+  if (req.query.approved) {
+    queryBuilder.where = {
+      ...queryBuilder.where,
+      isApproved: req.query.approved === "true",
+    };
+  }
+
+  // Filter by date range
+  if (req.query.startDate) {
+    queryBuilder.where = {
+      ...queryBuilder.where,
+      createdAt: {
+        ...queryBuilder.where?.createdAt,
+        [Op.gte]: new Date(req.query.startDate as string),
+      },
+    };
+  }
+
+  if (req.query.endDate) {
+    queryBuilder.where = {
+      ...queryBuilder.where,
+      createdAt: {
+        ...queryBuilder.where?.createdAt,
+        [Op.lte]: new Date(req.query.endDate as string),
+      },
+    };
+  }
+
+  // Pagination
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const offset = (page - 1) * limit;
+
+  queryBuilder.limit = limit;
+  queryBuilder.offset = offset;
+
+  // Execute query
+  const { count, rows: reviews } = await Review.findAndCountAll(queryBuilder);
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(count / limit);
+
+  res.status(200).json({
+    status: "success",
+    results: reviews.length,
+    pagination: {
+      totalReviews: count,
+      totalPages,
+      currentPage: page,
+      limit,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    },
+    data: {
+      reviews,
+    },
   });
 });

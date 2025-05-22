@@ -1,6 +1,6 @@
 import express from "express";
 import * as reviewController from "../controllers/reviewController";
-import { authenticate } from "../middleware/auth";
+import { authenticate, protect, restrictTo } from "../middleware/auth";
 import { hasPermission } from "../middleware/roleCheck";
 
 const router = express.Router();
@@ -21,5 +21,20 @@ router.delete("/:id", reviewController.deleteReview);
 
 // Public routes must come after specific routes to avoid conflicts
 router.get("/:id", reviewController.getReviewById);
+
+// Public routes
+router.get('/product/:productId', reviewController.getProductReviews);
+router.get('/product/:productId/stats', reviewController.getProductReviewStats);
+
+// Protected routes
+router.use(protect);
+
+// Customer routes
+router.post('/product/:productId', restrictTo('customer'), reviewController.createReview);
+router.put('/:id', restrictTo('customer'), reviewController.updateReview);
+router.delete('/:id', restrictTo('customer'), reviewController.deleteReview);
+
+// Supplier routes - read-only access to their product reviews
+router.get('/supplier', restrictTo('supplier'), reviewController.getSupplierProductReviews);
 
 export default router;

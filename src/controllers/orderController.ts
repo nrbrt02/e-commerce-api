@@ -187,7 +187,7 @@ export const getOrderById = asyncHandler(
     }
 
     // If the user is a customer, ensure they can only access their own orders
-    if (req.user && !(await req.user.hasRole("admin"))) {
+    if (req.user && req.user.role !== "admin") {
       if (order.customerId !== req.user.id) {
         throw new AppError(
           "You do not have permission to access this order",
@@ -537,7 +537,7 @@ export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
     }
 
     // If the user is a customer, ensure they can only cancel their own orders
-    if (req.user && !(await req.user.hasRole("admin"))) {
+    if (req.user && req.user.role !== "admin") {
       if (order.customerId !== req.user.id) {
         throw new AppError(
           "You do not have permission to cancel this order",
@@ -892,6 +892,7 @@ export const updateOrderDraft = asyncHandler(
         shippingMethod,
         notes,
         total,
+        totalAmount,
         shipping,
         lastUpdated
       } = req.body;
@@ -899,12 +900,17 @@ export const updateOrderDraft = asyncHandler(
       // Initialize update data object
       const updateData: any = {};
 
+      // Check for totalAmount or total in request
+      if (totalAmount !== undefined || total !== undefined) {
+        updateData.totalAmount = totalAmount !== undefined ? parseFloat(totalAmount.toString()) : parseFloat(total.toString());
+      }
+
       // Only update fields that were provided in the request
       if (items !== undefined) {
         // Validate items
         if (!Array.isArray(items)) {
-          throw new AppError("Items must be an array", 400);
-        }
+        throw new AppError("Items must be an array", 400);
+      }
 
         // Remove existing items
         await OrderItem.destroy({
@@ -989,7 +995,7 @@ export const updateOrderDraft = asyncHandler(
 
       // Only update if there are changes
       if (Object.keys(updateData).length > 0) {
-        await draftOrder.update(updateData, { transaction });
+      await draftOrder.update(updateData, { transaction });
       }
 
       // Commit transaction
