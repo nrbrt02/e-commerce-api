@@ -7,13 +7,17 @@ const router = express.Router();
 // Apply authentication to all routes
 router.use(protect);
 
-// Public routes (with optional authentication)
-router.get('/:id/products', supplierController.getSupplierProducts);
-
 // Admin only routes
 router.route('/')
   .get(restrictTo('admin'), supplierController.getSuppliers)
   .post(restrictTo('admin'), supplierController.createSupplier);
+
+// Admin stats route (must be before :id routes)
+router.route('/admin/stats')
+  .get(restrictTo('admin'), supplierController.getAdminStats);
+
+// Public routes (with optional authentication)
+router.get('/:id/products', supplierController.getSupplierProducts);
 
 // Admin and supplier routes (with access control in the controller)
 router.route('/:id')

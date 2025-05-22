@@ -3,6 +3,7 @@ import asyncHandler from '../utils/asyncHandler';
 import { AppError } from '../middleware/errorHandler';
 import models from '../models';
 import { Op } from 'sequelize';
+import sequelize from '../config/db';
 
 const { Supplier, Product, Order, OrderItem } = models;
 
@@ -593,7 +594,7 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
       isDigital: false,
       quantity: {
         [Op.gt]: 0,
-        [Op.lte]: models.sequelize.literal('"lowStockThreshold"')
+        [Op.lte]: 10 // Using a fixed threshold of 10 for now
       }
     }
   });
@@ -639,7 +640,8 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
         status: {
           [Op.notIn]: ['cancelled', 'refunded']
         }
-      }
+      },
+      attributes: []
     }]
   });
   
@@ -662,7 +664,8 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
         createdAt: {
           [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
         }
-      }
+      },
+      attributes: []
     }]
   });
   
@@ -678,11 +681,11 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
     },
     attributes: [
       [
-        models.sequelize.fn('AVG', 
-          models.sequelize.cast(
-            models.sequelize.fn('NULLIF', 
-              models.sequelize.fn('JSONB_EXTRACT_PATH_TEXT', 
-                models.sequelize.col('metadata'), 
+        sequelize.fn('AVG', 
+          sequelize.cast(
+            sequelize.fn('NULLIF', 
+              sequelize.fn('JSONB_EXTRACT_PATH_TEXT', 
+                sequelize.col('metadata'), 
                 'rating', 
                 'average'
               ), 
@@ -698,6 +701,175 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
   });
   
   const averageRating = avgRatingResult ? parseFloat((avgRatingResult as any).avgRating) || 0 : 0;
+  
+  // Monthly Sales Chart (Bar Chart) - Current Year
+  const currentYear = new Date().getFullYear();
+  const monthlyOrders = await Order.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"')), 'month'],
+      [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count']
+    ],
+    include: [{
+      model: OrderItem,
+      as: 'items',
+      where: {
+        productId: {
+          [Op.in]: productIds
+        }
+      },
+      attributes: []
+    }],
+    where: {
+      createdAt: {
+        [Op.gte]: new Date(currentYear, 0, 1),
+        [Op.lt]: new Date(currentYear + 1, 0, 1)
+      }
+    },
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Monthly Sales Chart (Bar Chart) - Previous Year
+  const previousYear = currentYear - 1;
+  const previousYearMonthlyOrders = await Order.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"')), 'month'],
+      [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count']
+    ],
+    include: [{
+      model: OrderItem,
+      as: 'items',
+      where: {
+        productId: {
+          [Op.in]: productIds
+        }
+      },
+      attributes: []
+    }],
+    where: {
+      createdAt: {
+        [Op.gte]: new Date(previousYear, 0, 1),
+        [Op.lt]: new Date(currentYear, 0, 1)
+      }
+    },
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Monthly Revenue Chart (Line Chart) - Current Year
+  const monthlyRevenue = await OrderItem.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"')), 'month'],
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'revenue']
+    ],
+    include: [{
+      model: Order,
+      as: 'order',
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        status: {
+          [Op.notIn]: ['cancelled', 'refunded']
+        }
+      },
+      attributes: []
+    }],
+    where: {
+      productId: {
+        [Op.in]: productIds
+      }
+    },
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Monthly Revenue Chart (Line Chart) - Previous Year
+  const previousYearMonthlyRevenue = await OrderItem.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"')), 'month'],
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'revenue']
+    ],
+    include: [{
+      model: Order,
+      as: 'order',
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(previousYear, 0, 1),
+          [Op.lt]: new Date(currentYear, 0, 1)
+        },
+        status: {
+          [Op.notIn]: ['cancelled', 'refunded']
+        }
+      },
+      attributes: []
+    }],
+    where: {
+      productId: {
+        [Op.in]: productIds
+      }
+    },
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Products Distribution Chart (Doughnut Chart)
+  const productDistribution = {
+    published: publishedProducts,
+    featured: featuredProducts,
+    outOfStock: outOfStockProducts,
+    lowStock: lowStockProducts
+  };
+  
+  // Top Products Table (Data Grid)
+  const topProducts = await OrderItem.findAll({
+    attributes: [
+      'productId',
+      [sequelize.fn('SUM', sequelize.col('OrderItem.quantity')), 'unitsSold'],
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'revenue']
+    ],
+    include: [{
+      model: Product,
+      as: 'product',
+      attributes: ['name']
+    }],
+    where: {
+      productId: {
+        [Op.in]: productIds
+      }
+    },
+    group: ['productId', 'product.id', 'product.name'],
+    order: [[sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'DESC']],
+    limit: 10,
+    raw: true
+  });
+  
+  // Top Suppliers Table
+  const topSuppliers = await OrderItem.findAll({
+    attributes: [
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'totalRevenue'],
+      [sequelize.fn('COUNT', sequelize.col('OrderItem.id')), 'totalOrders']
+    ],
+    include: [{
+      model: Product,
+      as: 'product',
+      attributes: ['supplierId'],
+      include: [{
+        model: Supplier,
+        as: 'supplier',
+        attributes: ['name']
+      }]
+    }],
+    group: [
+      'product.supplierId',
+      'product->supplier.id',
+      'product->supplier.name'
+    ],
+    order: [[sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'DESC']],
+    limit: 10,
+    raw: true
+  });
   
   // Return dashboard stats
   res.status(200).json({
@@ -725,8 +897,329 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
         rating: {
           average: parseFloat(averageRating.toFixed(1))
         }
+      },
+      monthlySales: {
+        currentYear: monthlyOrders,
+        previousYear: previousYearMonthlyOrders
+      },
+      monthlyRevenue: {
+        currentYear: monthlyRevenue,
+        previousYear: previousYearMonthlyRevenue
+      },
+      productDistribution,
+      topProducts,
+      topSuppliers
+    },
+  });
+});
+
+/**
+ * Get admin dashboard statistics for all suppliers
+ * @route GET /api/admin/stats
+ * @access Private (Admin)
+ */
+export const getAdminStats = asyncHandler(async (req: Request, res: Response) => {
+  // Verify authorization (admin or superadmin only)
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    throw new AppError('You are not authorized to view these statistics', 403);
+  }
+
+  // Get total suppliers count
+  const totalSuppliers = await Supplier.count();
+  
+  // Get active suppliers count
+  const activeSuppliers = await Supplier.count({
+    where: { isActive: true }
+  });
+  
+  // Get verified suppliers count
+  const verifiedSuppliers = await Supplier.count({
+    where: { isVerified: true }
+  });
+
+  // Get total products count
+  const totalProducts = await Product.count();
+  
+  // Get published products count
+  const publishedProducts = await Product.count({ 
+    where: { isPublished: true } 
+  });
+  
+  // Get featured products count
+  const featuredProducts = await Product.count({ 
+    where: { isFeatured: true } 
+  });
+  
+  // Get products out of stock
+  const outOfStockProducts = await Product.count({ 
+    where: { 
+      isDigital: false,
+      quantity: 0
+    } 
+  });
+  
+  // Get products running low on stock
+  const lowStockProducts = await Product.count({
+    where: {
+      isDigital: false,
+      quantity: {
+        [Op.gt]: 0,
+        [Op.lte]: 10
+      }
+    }
+  });
+
+  // Get recent orders count (last 30 days)
+  const recentOrdersCount = await Order.count({
+    where: {
+      createdAt: {
+        [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      }
+    }
+  });
+
+  // Get total revenue from all time
+  const totalRevenueResult = await OrderItem.sum('total', {
+    include: [{
+      model: Order,
+      as: 'order',
+      where: {
+        status: {
+          [Op.notIn]: ['cancelled', 'refunded']
+        }
+      },
+      attributes: []
+    }]
+  });
+  
+  const totalRevenue = totalRevenueResult || 0;
+  
+  // Get total revenue from last 30 days
+  const recentRevenueResult = await OrderItem.sum('total', {
+    include: [{
+      model: Order,
+      as: 'order',
+      where: {
+        status: {
+          [Op.notIn]: ['cancelled', 'refunded']
+        },
+        createdAt: {
+          [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        }
+      },
+      attributes: []
+    }]
+  });
+  
+  const recentRevenue = recentRevenueResult || 0;
+
+  // Get average rating across all products
+  const avgRatingResult = await Product.findOne({
+    where: {
+      metadata: {
+        [Op.ne]: null
       }
     },
+    attributes: [
+      [
+        sequelize.fn('AVG', 
+          sequelize.cast(
+            sequelize.fn('NULLIF', 
+              sequelize.fn('JSONB_EXTRACT_PATH_TEXT', 
+                sequelize.col('metadata'), 
+                'rating', 
+                'average'
+              ), 
+              ''
+            ), 
+            'FLOAT'
+          )
+        ),
+        'avgRating'
+      ]
+    ],
+    raw: true
+  });
+  
+  const averageRating = avgRatingResult ? parseFloat((avgRatingResult as any).avgRating) || 0 : 0;
+
+  // Monthly Sales Chart (Bar Chart) - Current Year
+  const currentYear = new Date().getFullYear();
+  const monthlyOrders = await Order.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"')), 'month'],
+      [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count']
+    ],
+    where: {
+      createdAt: {
+        [Op.gte]: new Date(currentYear, 0, 1),
+        [Op.lt]: new Date(currentYear + 1, 0, 1)
+      }
+    },
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Monthly Sales Chart (Bar Chart) - Previous Year
+  const previousYear = currentYear - 1;
+  const previousYearMonthlyOrders = await Order.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"')), 'month'],
+      [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count']
+    ],
+    where: {
+      createdAt: {
+        [Op.gte]: new Date(previousYear, 0, 1),
+        [Op.lt]: new Date(currentYear, 0, 1)
+      }
+    },
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "Order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Monthly Revenue Chart (Line Chart) - Current Year
+  const monthlyRevenue = await OrderItem.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"')), 'month'],
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'revenue']
+    ],
+    include: [{
+      model: Order,
+      as: 'order',
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        status: {
+          [Op.notIn]: ['cancelled', 'refunded']
+        }
+      },
+      attributes: []
+    }],
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"'))],
+    raw: true
+  });
+  
+  // Monthly Revenue Chart (Line Chart) - Previous Year
+  const previousYearMonthlyRevenue = await OrderItem.findAll({
+    attributes: [
+      [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"')), 'month'],
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'revenue']
+    ],
+    include: [{
+      model: Order,
+      as: 'order',
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(previousYear, 0, 1),
+          [Op.lt]: new Date(currentYear, 0, 1)
+        },
+        status: {
+          [Op.notIn]: ['cancelled', 'refunded']
+        }
+      },
+      attributes: []
+    }],
+    group: [sequelize.fn('EXTRACT', sequelize.literal('MONTH FROM "order"."createdAt"'))],
+    raw: true
+  });
+
+  // Products Distribution Chart (Doughnut Chart)
+  const productDistribution = {
+    published: publishedProducts,
+    featured: featuredProducts,
+    outOfStock: outOfStockProducts,
+    lowStock: lowStockProducts
+  };
+
+  // Top Products Table (Data Grid)
+  const topProducts = await OrderItem.findAll({
+    attributes: [
+      'productId',
+      [sequelize.fn('SUM', sequelize.col('OrderItem.quantity')), 'unitsSold'],
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'revenue']
+    ],
+    include: [{
+      model: Product,
+      as: 'product',
+      attributes: ['name', 'supplierId'],
+      include: [{
+        model: Supplier,
+        as: 'supplier',
+        attributes: ['name']
+      }]
+    }],
+    group: ['productId', 'product.id', 'product.name', 'product.supplierId', 'product->supplier.id', 'product->supplier.name'],
+    order: [[sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'DESC']],
+    limit: 10,
+    raw: true
+  });
+
+  // Top Suppliers Table
+  const topSuppliers = await OrderItem.findAll({
+    attributes: [
+      [sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'totalRevenue'],
+      [sequelize.fn('COUNT', sequelize.col('OrderItem.id')), 'totalOrders']
+    ],
+    include: [{
+      model: Product,
+      as: 'product',
+      attributes: ['supplierId'],
+      include: [{
+        model: Supplier,
+        as: 'supplier',
+        attributes: ['name']
+      }]
+    }],
+    group: [
+      'product.supplierId',
+      'product->supplier.id',
+      'product->supplier.name'
+    ],
+    order: [[sequelize.fn('SUM', sequelize.col('OrderItem.total')), 'DESC']],
+    limit: 10,
+    raw: true
+  });
+
+  // Return admin dashboard stats
+  res.status(200).json({
+    status: 'success',
+    data: {
+      suppliers: {
+        total: totalSuppliers,
+        active: activeSuppliers,
+        verified: verifiedSuppliers
+      },
+      products: {
+        total: totalProducts,
+        published: publishedProducts,
+        featured: featuredProducts,
+        outOfStock: outOfStockProducts,
+        lowStock: lowStockProducts
+      },
+      orders: {
+        recentCount: recentOrdersCount
+      },
+      revenue: {
+        total: totalRevenue,
+        recent: recentRevenue
+      },
+      rating: {
+        average: parseFloat(averageRating.toFixed(1))
+      },
+      monthlySales: {
+        currentYear: monthlyOrders,
+        previousYear: previousYearMonthlyOrders
+      },
+      monthlyRevenue: {
+        currentYear: monthlyRevenue,
+        previousYear: previousYearMonthlyRevenue
+      },
+      productDistribution,
+      topProducts,
+      topSuppliers
+    }
   });
 });
 
@@ -739,5 +1232,6 @@ export default {
   updateSupplier,
   updateSupplierPassword,
   deleteSupplier,
-  getSupplierStats
+  getSupplierStats,
+  getAdminStats
 };
