@@ -708,7 +708,7 @@ export const getSupplierProductReviews = asyncHandler(async (req: Request, res: 
         model: Product,
         as: "product",
         where: { supplierId },
-        attributes: ["id", "name", "sku", "imageUrls", "mainImage", "images"],
+        attributes: ["id", "name", "sku", "imageUrls"],
       },
       {
         model: Customer,

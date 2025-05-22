@@ -19,8 +19,8 @@ router.post("/:id/vote", reviewController.voteReviewHelpful);
 router.put("/:id", reviewController.updateReview);
 router.delete("/:id", reviewController.deleteReview);
 
-// Public routes must come after specific routes to avoid conflicts
-router.get("/:id", reviewController.getReviewById);
+// Supplier routes - read-only access to their product reviews
+router.get('/supplier', restrictTo('supplier'), reviewController.getSupplierProductReviews);
 
 // Public routes
 router.get('/product/:productId', reviewController.getProductReviews);
@@ -34,7 +34,7 @@ router.post('/product/:productId', restrictTo('customer'), reviewController.crea
 router.put('/:id', restrictTo('customer'), reviewController.updateReview);
 router.delete('/:id', restrictTo('customer'), reviewController.deleteReview);
 
-// Supplier routes - read-only access to their product reviews
-router.get('/supplier', restrictTo('supplier'), reviewController.getSupplierProductReviews);
+// Public routes must come after specific routes to avoid conflicts
+router.get("/:id", reviewController.getReviewById);
 
 export default router;
