@@ -16,6 +16,10 @@ router.route('/')
 router.route('/admin/stats')
   .get(restrictTo('admin'), supplierController.getAdminStats);
 
+// Supplier public info update route (must be before :id routes)
+router.route('/me')
+  .put(restrictTo('supplier'), supplierController.updateSupplierPublicInfo);
+
 // Public routes (with optional authentication)
 router.get('/:id/products', supplierController.getSupplierProducts);
 
@@ -29,9 +33,9 @@ router.route('/:id/password')
   .put(supplierController.updateSupplierPassword);
 
 router.route('/:id/orders')
-  .get(supplierController.getSupplierOrders);
+  .get(restrictTo('admin', 'super-admin'), supplierController.getSupplierOrders);
   
 router.route('/:id/stats')
-  .get(supplierController.getSupplierStats);
+  .get(restrictTo('supplier', 'admin', 'super-admin'), supplierController.getSupplierStats);
 
 export default router;

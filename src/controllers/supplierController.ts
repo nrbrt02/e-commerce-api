@@ -101,7 +101,7 @@ export const getSupplierById = asyncHandler(async (req: Request, res: Response) 
   }
 
   // If requester is a supplier, they can only view their own profile
-  if (req.user.role === 'supplier' && req.user.id !== parseInt(req.params.id)) {
+  if (!['admin', 'superadmin'].includes(req.user.role) && req.user.id !== parseInt(req.params.id)) {
     throw new AppError('You are not authorized to view this supplier', 403);
   }
 
@@ -218,7 +218,7 @@ export const getSupplierOrders = asyncHandler(async (req: Request, res: Response
   }
   
   // Verify authorization (admin or the supplier itself)
-  if (req.user.role !== 'admin' && (req.user.role !== 'supplier' || req.user.id !== supplierId)) {
+  if (!['admin', 'superadmin'].includes(req.user.role) && req.user.id !== supplierId) {
     throw new AppError('You are not authorized to access these orders', 403);
   }
   
@@ -404,7 +404,7 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
   }
   
   // Verify authorization (admin or the supplier itself)
-  if (req.user.role !== 'admin' && (req.user.role !== 'supplier' || req.user.id !== supplierId)) {
+  if (!['admin', 'superadmin'].includes(req.user.role) && req.user.id !== supplierId) {
     throw new AppError('You are not authorized to update this supplier', 403);
   }
   
@@ -474,14 +474,14 @@ export const updateSupplierPassword = asyncHandler(async (req: Request, res: Res
   }
   
   // Verify authorization (admin or the supplier itself)
-  if (req.user.role !== 'admin' && (req.user.role !== 'supplier' || req.user.id !== supplierId)) {
+  if (!['admin', 'superadmin'].includes(req.user.role) && req.user.id !== supplierId) {
     throw new AppError('You are not authorized to update this supplier password', 403);
   }
   
   const { currentPassword, newPassword } = req.body;
   
   // Admin can update password without providing current password
-  if (req.user.role === 'admin') {
+  if (['admin', 'superadmin'].includes(req.user.role)) {
     if (!newPassword) {
       throw new AppError('Please provide new password', 400);
     }
@@ -555,7 +555,7 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
   }
   
   // Verify authorization (admin or the supplier itself)
-  if (req.user.role !== 'admin' && (req.user.role !== 'supplier' || req.user.id !== supplierId)) {
+  if (!['admin', 'superadmin'].includes(req.user.role) && req.user.id !== supplierId) {
     throw new AppError('You are not authorized to view these statistics', 403);
   }
   
@@ -920,7 +920,7 @@ export const getSupplierStats = asyncHandler(async (req: Request, res: Response)
  */
 export const getAdminStats = asyncHandler(async (req: Request, res: Response) => {
   // Verify authorization (admin or superadmin only)
-  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+  if (!['admin', 'superadmin'].includes(req.user.role)) {
     throw new AppError('You are not authorized to view these statistics', 403);
   }
 
@@ -1223,6 +1223,76 @@ export const getAdminStats = asyncHandler(async (req: Request, res: Response) =>
   });
 });
 
+/**
+ * Update supplier public information
+ * @route PUT /api/suppliers/me
+ * @access Private (Supplier)
+ */
+export const updateSupplierPublicInfo = asyncHandler(async (req: Request, res: Response) => {
+  // Verify that the user is a supplier
+  if (req.user.role !== 'supplier') {
+    throw new AppError('Only suppliers can update their public information', 403);
+  }
+
+  const supplierId = req.user.id;
+  
+  // Check if supplier exists
+  const supplier = await Supplier.findByPk(supplierId);
+  
+  if (!supplier) {
+    throw new AppError('Supplier not found', 404);
+  }
+  
+  const {
+    name,
+    email,
+    contactPerson,
+    phone,
+    address,
+    website,
+    description,
+    tin,
+    bio,
+    businessAddress,
+    companyName,
+    taxId
+  } = req.body;
+  
+  // Check if email is being changed and is already in use
+  if (email && email !== supplier.email) {
+    const existingSupplier = await Supplier.findOne({ where: { email } });
+    if (existingSupplier) {
+      throw new AppError('Email already in use', 400);
+    }
+  }
+  
+  // Update only public fields
+  if (name) supplier.name = name;
+  if (email) supplier.email = email;
+  if (contactPerson) supplier.contactPerson = contactPerson;
+  if (phone !== undefined) supplier.phone = phone;
+  if (address !== undefined) supplier.address = address;
+  if (website !== undefined) supplier.website = website;
+  if (description !== undefined) supplier.description = description;
+  if (tin !== undefined) supplier.tin = tin;
+  if (bio !== undefined) supplier.bio = bio;
+  if (businessAddress !== undefined) supplier.businessAddress = businessAddress;
+  if (companyName !== undefined) supplier.companyName = companyName;
+  if (taxId !== undefined) supplier.taxId = taxId;
+  
+  await supplier.save();
+  
+  // Remove password from response
+  const supplierData = supplier.toJSON();
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      supplier: supplierData,
+    },
+  });
+});
+
 export default {
   getSuppliers,
   getSupplierById,
@@ -1233,5 +1303,6 @@ export default {
   updateSupplierPassword,
   deleteSupplier,
   getSupplierStats,
-  getAdminStats
+  getAdminStats,
+  updateSupplierPublicInfo
 };

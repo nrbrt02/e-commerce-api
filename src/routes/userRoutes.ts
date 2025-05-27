@@ -8,17 +8,17 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(protect);
 
-// Admin-only routes
+// Superadmin-only routes for managing administrators
 router.route('/')
-  .get(hasPermission(['user:view']), userController.getUsers)
-  .post(hasPermission(['user:create']), userController.createUser);
+  .get(hasRole(['superadmin']), userController.getAdminUsers)
+  .post(hasRole(['superadmin']), userController.createAdminUser);
 
 router.route('/:id')
-  .get(hasPermission(['user:view']), userController.getUserById)
-  .put(hasPermission(['user:update']), userController.updateUser)
-  .delete(hasPermission(['user:delete']), userController.deleteUser);
+  .get(hasRole(['superadmin']), userController.getAdminUserById)
+  .put(hasRole(['superadmin']), userController.updateAdminUser)
+  .delete(hasRole(['superadmin']), userController.deleteAdminUser);
 
 router.route('/:id/password')
-  .put(hasPermission(['user:update']), userController.updateUserPassword);
+  .put(hasRole(['superadmin']), userController.updateAdminPassword);
 
 export default router;

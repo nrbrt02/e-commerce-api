@@ -19,7 +19,10 @@ declare global {
 // Interface for JWT payload
 interface JwtPayload {
   id: number;
-  role: string;
+  role?: string;
+  roles?: string[];
+  username?: string;
+  email?: string;
   iat: number;
   exp: number;
 }
@@ -64,9 +67,20 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     const secretKey: Secret = config.jwt.secret;
     const decoded = jwt.verify(token, secretKey) as JwtPayload;
 
+    // Determine role from either role or roles array
+    let role: string;
+    if (decoded.role) {
+      role = decoded.role.toLowerCase();
+    } else if (decoded.roles && decoded.roles.length > 0) {
+      // If roles array exists, use the first role
+      role = decoded.roles[0].toLowerCase();
+    } else {
+      throw new AppError('Invalid token format', 401);
+    }
+
     // Determine which model to use based on role
     let Model;
-    switch(decoded.role) {
+    switch(role) {
       case 'admin':
       case 'superadmin':
         Model = User;
@@ -90,7 +104,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     // Attach user to request
     req.user = currentUser;
-    req.user.role = decoded.role;
+    req.user.role = role; // Store role in lowercase
 
     next();
   } catch (error) {
