@@ -1,7 +1,8 @@
 import express from 'express';
 import * as customerController from '../controllers/customerController';
 import { authenticate } from '../middleware/auth';
-import { hasRole, hasPermission } from '../middleware/roleCheck';
+import { hasPermission } from '../middleware/roleCheck';
+import { restrictTo } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -14,8 +15,8 @@ router.put('/profile', customerController.updateProfile);
 router.put('/profile/password', customerController.updatePassword);
 
 // Admin routes
-router.get('/', hasPermission(['customer:view']), customerController.getCustomers);
-router.get('/:id', hasPermission(['customer:view']), customerController.getCustomerById);
+router.get('/', restrictTo('admin'), customerController.getCustomers);
+router.get('/:id', restrictTo('admin'), customerController.getCustomerById);
 router.put('/:id', hasPermission(['customer:update']), customerController.updateCustomer);
 router.delete('/:id', hasPermission(['customer:delete']), customerController.deleteCustomer);
 router.put('/:id/password', hasPermission(['customer:update']), customerController.updateCustomerPassword);
