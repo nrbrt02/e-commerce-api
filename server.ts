@@ -20,8 +20,8 @@ import wishlistRoutes from './src/routes/wishlistRoutes';
 import orderRoutes from './src/routes/orderRoutes';
 import addressRoutes from './src/routes/addressRoutes';
 import reviewRoutes from './src/routes/reviewRoutes';
-import supplierRoutes from './src/routes/supplierRoutes'; // Import supplier routes
-
+import supplierRoutes from './src/routes/supplierRoutes';
+import statsRoutes from './src/routes/statsRoutes';
 // Middleware
 import { errorHandler } from './src/middleware/errorHandler';
 import logger from './src/config/logger';
@@ -62,7 +62,7 @@ app.use('/api/wishlists', wishlistRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/reviews', reviewRoutes);
-
+app.use('/api/stats', statsRoutes);
 // ✅ Global error handling
 app.use(errorHandler);
 

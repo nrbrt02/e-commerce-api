@@ -1,4 +1,3 @@
-// services/authService.ts
 import db from '../models';
 import { AppError } from '../middleware/errorHandler';
 import jwt from 'jsonwebtoken';

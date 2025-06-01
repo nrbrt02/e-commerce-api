@@ -17,7 +17,6 @@ import defineWishlistModel, { Wishlist } from './Wishlist';
 import defineWishlistItemModel, { WishlistItem } from './WishlistItem';
 import defineSupplierModel, { Supplier } from './Supplier';
 
-import config from '../config/db';
 
 
 // Create models object

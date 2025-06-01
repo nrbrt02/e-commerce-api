@@ -13,7 +13,7 @@ import categoryRoutes from './routes/categoryRoutes';
 import orderRoutes from './routes/orderRoutes';
 import addressRoutes from './routes/addressRoutes';
 import reviewRoutes from './routes/reviewRoutes';
-
+import statsRoutes from './routes/statsRoutes';
 // Create Express app
 const app: Express = express();
 
@@ -42,6 +42,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/stats', statsRoutes);
 
 // 404 handler - This needs to come AFTER all other routes
 app.use((_req: Request, res: Response) => {
